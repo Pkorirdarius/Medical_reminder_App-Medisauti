@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "MEDISAUTI",
+    "slug": "medisauti",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kabarak.medisauti",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MEDISAUTI needs camera access to scan prescription labels using OCR.",
+        "NSPhotoLibraryUsageDescription": "MEDISAUTI needs photo library access to scan saved prescription images.",
+        "NSMicrophoneUsageDescription": "Required for text-to-speech reminder playback."
+      }
+    },
+    "android": {
+      "package": "com.kabarak.medisauti",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        { "color": "#0F6E56" }
+      ],
+      [
+        "expo-image-picker",
+        { "photosPermission": "MEDISAUTI needs access to your photos to scan prescription images." }
+      ]
+    ]
+  }
+}
