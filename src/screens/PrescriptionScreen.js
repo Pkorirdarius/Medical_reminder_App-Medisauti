@@ -19,6 +19,7 @@ const INITIAL_FORM = {
   frequency: '',
   times:     ['08:00'],
   notes:     '',
+  source:    'manual', // 'manual' | 'doctor'
 };
 
 function FormInput({ label, value, onChangeText, placeholder, keyboardType = 'default' }) {
@@ -122,6 +123,7 @@ export default function PrescriptionScreen() {
           frequency: parsed.frequency || '',
           times:     parsed.times     || ['08:00'],
           notes:     '',
+          source:    'manual',
         });
         setShowForm(true);
         Alert.alert(
@@ -314,6 +316,38 @@ export default function PrescriptionScreen() {
                 placeholder={language === 'sw' ? 'e.g. Na chakula' : 'e.g. With food'}
               />
 
+              {/* Doctor source toggle */}
+              <View style={styles.sourceRow}>
+                <Text style={styles.formLabel}>
+                  {language === 'sw' ? 'Chanzo cha dawa' : 'Prescription source'}
+                </Text>
+                <View style={styles.sourceToggleRow}>
+                  <TouchableOpacity
+                    style={[styles.sourceBtn, form.source === 'manual' && styles.sourceBtnActive]}
+                    onPress={() => setForm(f => ({ ...f, source: 'manual' }))}
+                  >
+                    <Text style={[styles.sourceBtnText, form.source === 'manual' && styles.sourceBtnTextActive]}>
+                      {language === 'sw' ? '✍️ Mkono' : '✍️ Manual'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.sourceBtn, form.source === 'doctor' && styles.sourceBtnActive]}
+                    onPress={() => setForm(f => ({ ...f, source: 'doctor' }))}
+                  >
+                    <Text style={[styles.sourceBtnText, form.source === 'doctor' && styles.sourceBtnTextActive]}>
+                      {language === 'sw' ? '🩺 Daktari' : '🩺 Doctor'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {form.source === 'doctor' && (
+                  <Text style={styles.sourceHint}>
+                    {language === 'sw'
+                      ? 'Dawa imeingizwa kutoka kwa daktari. Hii itawekwa alama kwenye ripoti.'
+                      : 'Prescription recorded from doctor. This will be marked in the report.'}
+                  </Text>
+                )}
+              </View>
+
               <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
                 <Text style={styles.saveBtnText}>
                   {language === 'sw' ? '💾 Hifadhi Dawa' : '💾 Save Prescription'}
@@ -331,7 +365,14 @@ export default function PrescriptionScreen() {
               {prescriptions.map((p, i) => (
                 <View key={p.id || i} style={styles.savedRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.medName}>{p.drugName} {p.dosage}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.medName}>{p.drugName} {p.dosage}</Text>
+                      {p.source === 'doctor' && (
+                        <Text style={styles.sourceBadge}>
+                          {language === 'sw' ? '🩺 Daktari' : '🩺 Doctor'}
+                        </Text>
+                      )}
+                    </View>
                     <Text style={styles.medSub}>{p.frequency} · {(p.times || []).join(', ')}</Text>
                     {p.notes ? <Text style={styles.medSub}>{p.notes}</Text> : null}
                   </View>
@@ -416,10 +457,23 @@ const styles = StyleSheet.create({
   },
   saveBtnText:        { color: '#fff', fontSize: 15, fontWeight: '600' },
 
+  sourceRow:          { marginBottom: 12 },
+  sourceToggleRow:    { flexDirection: 'row', gap: 8, marginTop: 4 },
+  sourceBtn:          {
+    flex: 1, paddingVertical: 10, alignItems: 'center',
+    borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#ccc',
+    backgroundColor: '#fff',
+  },
+  sourceBtnActive:    { borderColor: COLORS.teal[400], backgroundColor: COLORS.teal[50] },
+  sourceBtnText:      { fontSize: 13, color: COLORS.text.secondary },
+  sourceBtnTextActive:{ color: COLORS.teal[600], fontWeight: '600' },
+  sourceHint:         { fontSize: 11, color: COLORS.text.secondary, marginTop: 4, fontStyle: 'italic' },
+
   savedRow:           {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8',
   },
   medName:            { fontSize: 14, fontWeight: '500', color: COLORS.text.primary },
   medSub:             { fontSize: 12, color: COLORS.text.secondary, marginTop: 1 },
+  sourceBadge:        { fontSize: 11, fontWeight: '600', color: COLORS.teal[600], backgroundColor: COLORS.teal[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
 });

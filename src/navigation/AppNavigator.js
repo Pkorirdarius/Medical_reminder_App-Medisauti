@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View } from 'react-native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { Text, View, ActivityIndicator } from 'react-native';
 
+import { HighContrastProvider } from '../utils/HighContrastContext';
+import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
 import PrescriptionScreen from '../screens/PrescriptionScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ReportScreen from '../screens/ReportScreen';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
 
 const TEAL = '#0F6E56';
 const GRAY = '#888780';
@@ -29,7 +33,7 @@ function TabIcon({ label, focused }) {
   );
 }
 
-export default function AppNavigator() {
+function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -65,5 +69,37 @@ export default function AppNavigator() {
         options={{ tabBarIcon: ({ focused }) => <TabIcon label="Ripoti" focused={focused} /> }}
       />
     </Tab.Navigator>
+  );
+}
+
+export default function AppNavigator() {
+  const [ready, setReady] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  useEffect(() => {
+    setReady(true);
+  }, []);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F6E56' }}>
+        <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', marginBottom: 16 }}>MEDISAUTI</Text>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  return (
+    <HighContrastProvider>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!authenticated ? (
+          <Stack.Screen name="Auth">
+            {() => <AuthScreen onAuthSuccess={() => setAuthenticated(true)} />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen name="Main" component={MainTabs} />
+        )}
+      </Stack.Navigator>
+    </HighContrastProvider>
   );
 }

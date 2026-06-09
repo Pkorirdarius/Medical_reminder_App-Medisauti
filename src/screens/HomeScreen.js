@@ -8,9 +8,9 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { COLORS, RADIUS, SHADOW, FONTS } from '../utils/constants';
 import { getUser, getPrescriptions, calcAdherence } from '../utils/storage';
+import { useHighContrast } from '../utils/HighContrastContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
-// ─── Pill badge component ─────────────────────────────────────────────
 function Badge({ label, type = 'teal' }) {
   const colors = {
     teal:   { bg: COLORS.teal[50],  text: COLORS.teal[600]  },
@@ -26,7 +26,6 @@ function Badge({ label, type = 'teal' }) {
   );
 }
 
-// ─── Medication list item ─────────────────────────────────────────────
 function MedItem({ med, onSpeak }) {
   const badgeType = med.stock === 'low' ? 'amber' : 'teal';
   const badgeLabel = med.stock === 'low' ? 'Low stock' : 'Active';
@@ -47,16 +46,17 @@ function MedItem({ med, onSpeak }) {
   );
 }
 
-// ─── Main Home Screen ─────────────────────────────────────────────────
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const { highContrast, toggleHighContrast, COLORS: HC } = useHighContrast();
 
-  const [user, setUser]                 = useState({ name: 'Darius' });
-  const [prescriptions, setPrescriptions] = useState([]);
-  const [adherence, setAdherence]       = useState({ rate: 0, taken: 0, missed: 0 });
-  const [nextReminder, setNextReminder] = useState(null);
-  const [speaking, setSpeaking]         = useState(false);
-  const [loading, setLoading]           = useState(true);
+  const [user, setUser]                     = useState({ name: 'Darius' });
+  const [prescriptions, setPrescriptions]   = useState([]);
+  const [adherence, setAdherence]           = useState({ rate: 0, taken: 0, missed: 0 });
+  const [nextReminder, setNextReminder]     = useState(null);
+  const [speaking, setSpeaking]             = useState(false);
+  const [loading, setLoading]               = useState(true);
+  const [language, setLanguage]             = useState('sw');
 
   useFocusEffect(
     useCallback(() => {
@@ -97,7 +97,7 @@ export default function HomeScreen() {
         const medMinutes = h * 60 + m;
         const diff = medMinutes > nowMinutes
           ? medMinutes - nowMinutes
-          : 1440 - nowMinutes + medMinutes; // tomorrow
+          : 1440 - nowMinutes + medMinutes;
 
         if (diff < nearestDiff) {
           nearestDiff = diff;
@@ -130,16 +130,29 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, highContrast && { backgroundColor: '#003D2C' }]}>
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.greeting}>{greeting()}, {user.name} 👋</Text>
             <Text style={styles.subGreeting}>Dawa yako ya leo · Your meds today</Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {(user.name || 'U').slice(0, 2).toUpperCase()}
-            </Text>
+          <View style={styles.headerRight}>
+            {/* Language toggle */}
+            <TouchableOpacity
+              style={styles.langToggleBtn}
+              onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')}
+            >
+              <Text style={styles.langToggleText}>{language === 'sw' ? 'EN' : 'SW'}</Text>
+            </TouchableOpacity>
+            {/* High contrast toggle */}
+            <TouchableOpacity onPress={toggleHighContrast} style={styles.hcToggleBtn}>
+              <Text style={{ fontSize: 16 }}>{highContrast ? '🔆' : '🌓'}</Text>
+            </TouchableOpacity>
+            <View style={[styles.avatar, highContrast && { backgroundColor: 'rgba(255,255,255,0.4)' }]}>
+              <Text style={styles.avatarText}>
+                {(user.name || 'U').slice(0, 2).toUpperCase()}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -227,6 +240,13 @@ const styles = StyleSheet.create({
   container:      { flex: 1, backgroundColor: COLORS.background },
   header:         { backgroundColor: COLORS.teal[600], padding: 16, paddingBottom: 20 },
   headerRow:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  langToggleBtn: {
+    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: RADIUS.pill,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  langToggleText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  hcToggleBtn:    { padding: 4 },
   greeting:       { fontSize: 18, fontWeight: '600', color: '#fff' },
   subGreeting:    { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   avatar:         {
