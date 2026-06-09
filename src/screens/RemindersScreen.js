@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,18 +42,34 @@ function buildTodayReminders(prescriptions) {
 
 export default function RemindersScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef(null);
 
   const [reminders, setReminders]   = useState([]);
-  const [doseStatus, setDoseStatus] = useState({}); // key -> 'taken' | 'missed' | 'snoozed'
+  const [doseStatus, setDoseStatus] = useState({});
   const [language, setLanguage]     = useState('sw');
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => { load(); }, [])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollRef.current) {
+        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+      }
+    }, [])
+  );
+
   async function load() {
     const meds = await getPrescriptions();
     setReminders(buildTodayReminders(meds));
+    setRefreshing(false);
+  }
+
+  function onRefresh() {
+    setRefreshing(true);
+    load();
   }
 
   async function handleAction(reminder, action) {
@@ -141,7 +158,6 @@ export default function RemindersScreen() {
         </Text>
       </View>
 
-      {/* Lang toggle */}
       <View style={styles.langRow}>
         {['sw', 'en'].map(l => (
           <TouchableOpacity key={l} style={[styles.langBtn, language === l && styles.langBtnActive]} onPress={() => setLanguage(l)}>
@@ -152,9 +168,21 @@ export default function RemindersScreen() {
         ))}
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={{ padding: 12, paddingBottom: 40 }}>
-
-        {/* Legend */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={{ padding: 12, paddingBottom: 40, flexGrow: 1 }}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.teal[600]]}
+            tintColor={COLORS.teal[600]}
+          />
+        }
+      >
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: COLORS.green[400] }]} />
@@ -170,7 +198,6 @@ export default function RemindersScreen() {
           </View>
         </View>
 
-        {/* Actions legend */}
         <View style={[styles.legend, { marginBottom: 14 }]}>
           <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
             {language === 'sw'

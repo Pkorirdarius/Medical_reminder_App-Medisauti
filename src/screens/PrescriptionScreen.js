@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  RefreshControl,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,7 +20,7 @@ const INITIAL_FORM = {
   frequency: '',
   times:     ['08:00'],
   notes:     '',
-  source:    'manual', // 'manual' | 'doctor'
+  source:    'manual',
 };
 
 function FormInput({ label, value, onChangeText, placeholder, keyboardType = 'default' }) {
@@ -41,24 +42,39 @@ function FormInput({ label, value, onChangeText, placeholder, keyboardType = 'de
 export default function PrescriptionScreen() {
   const insets      = useSafeAreaInsets();
   const webviewRef  = useRef(null);
+  const scrollRef   = useRef(null);
 
   const [prescriptions, setPrescriptions] = useState([]);
   const [form, setForm]                   = useState(INITIAL_FORM);
   const [scanning, setScanning]           = useState(false);
   const [ocrProgress, setOcrProgress]     = useState(0);
-  const [language, setLanguage]           = useState('sw'); // 'sw' | 'en'
+  const [language, setLanguage]           = useState('sw');
   const [showForm, setShowForm]           = useState(false);
+  const [refreshing, setRefreshing]       = useState(false);
 
   useFocusEffect(
     useCallback(() => { loadPrescriptions(); }, [])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollRef.current) {
+        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+      }
+    }, [])
+  );
+
   async function loadPrescriptions() {
     const data = await getPrescriptions();
     setPrescriptions(data);
+    setRefreshing(false);
   }
 
-  // ─── Photo / OCR ────────────────────────────────────────────────────
+  function onRefresh() {
+    setRefreshing(true);
+    loadPrescriptions();
+  }
+
   async function handlePhotoScan() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -74,7 +90,7 @@ export default function PrescriptionScreen() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.8,
-      base64: true, // needed for WebView OCR
+      base64: true,
     });
 
     if (!result.canceled && result.assets?.[0]) {
@@ -82,7 +98,6 @@ export default function PrescriptionScreen() {
       setScanning(true);
       setOcrProgress(0);
 
-      // Send base64 image to WebView for OCR
       if (webviewRef.current) {
         webviewRef.current.postMessage(
           JSON.stringify({ imageUri: `data:image/jpeg;base64,${asset.base64}` })
@@ -126,6 +141,7 @@ export default function PrescriptionScreen() {
           source:    'manual',
         });
         setShowForm(true);
+        scrollRef.current?.scrollTo?.({ y: 0, animated: true });
         Alert.alert(
           language === 'sw' ? '✅ Imetambuliwa' : '✅ Detected',
           language === 'sw'
@@ -141,7 +157,6 @@ export default function PrescriptionScreen() {
     }
   }
 
-  // ─── Save prescription ───────────────────────────────────────────────
   async function handleSave() {
     if (!form.drugName.trim()) {
       Alert.alert(
@@ -159,7 +174,6 @@ export default function PrescriptionScreen() {
       notifIds:  [],
     };
 
-    // Schedule a notification for each dose time
     const notifIds = [];
     for (const time of prescription.times) {
       try {
@@ -198,7 +212,6 @@ export default function PrescriptionScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>
             {language === 'sw' ? '💊 Dawa · Prescriptions' : '💊 Prescriptions'}
@@ -208,7 +221,6 @@ export default function PrescriptionScreen() {
           </Text>
         </View>
 
-        {/* Language toggle */}
         <View style={styles.langRow}>
           {['sw', 'en'].map(l => (
             <TouchableOpacity
@@ -223,7 +235,6 @@ export default function PrescriptionScreen() {
           ))}
         </View>
 
-        {/* Hidden WebView for OCR */}
         <WebView
           ref={webviewRef}
           style={{ width: 0, height: 0 }}
@@ -233,9 +244,21 @@ export default function PrescriptionScreen() {
           domStorageEnabled
         />
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-
-          {/* Scan buttons */}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.teal[600]]}
+              tintColor={COLORS.teal[600]}
+            />
+          }
+        >
           <View style={styles.scanRow}>
             <TouchableOpacity
               style={[styles.scanBtn, styles.scanBtnPrimary]}
@@ -316,7 +339,6 @@ export default function PrescriptionScreen() {
                 placeholder={language === 'sw' ? 'e.g. Na chakula' : 'e.g. With food'}
               />
 
-              {/* Doctor source toggle */}
               <View style={styles.sourceRow}>
                 <Text style={styles.formLabel}>
                   {language === 'sw' ? 'Chanzo cha dawa' : 'Prescription source'}
@@ -356,7 +378,6 @@ export default function PrescriptionScreen() {
             </View>
           )}
 
-          {/* Existing prescriptions */}
           {prescriptions.length > 0 && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>
@@ -417,7 +438,7 @@ const styles = StyleSheet.create({
   langBtnTextActive:  { color: COLORS.teal[600], fontWeight: '600' },
 
   scroll:             { flex: 1 },
-  scrollContent:      { padding: 12, paddingBottom: 40 },
+  scrollContent:      { padding: 12, paddingBottom: 40, flexGrow: 1 },
 
   scanRow:            { flexDirection: 'row', gap: 10, marginBottom: 10 },
   scanBtn:            {
@@ -451,12 +472,6 @@ const styles = StyleSheet.create({
     padding: 10, fontSize: 14, color: COLORS.text.primary, backgroundColor: '#fff',
   },
 
-  saveBtn:            {
-    backgroundColor: COLORS.teal[600], borderRadius: RADIUS.md,
-    padding: 12, alignItems: 'center', marginTop: 4,
-  },
-  saveBtnText:        { color: '#fff', fontSize: 15, fontWeight: '600' },
-
   sourceRow:          { marginBottom: 12 },
   sourceToggleRow:    { flexDirection: 'row', gap: 8, marginTop: 4 },
   sourceBtn:          {
@@ -468,6 +483,12 @@ const styles = StyleSheet.create({
   sourceBtnText:      { fontSize: 13, color: COLORS.text.secondary },
   sourceBtnTextActive:{ color: COLORS.teal[600], fontWeight: '600' },
   sourceHint:         { fontSize: 11, color: COLORS.text.secondary, marginTop: 4, fontStyle: 'italic' },
+
+  saveBtn:            {
+    backgroundColor: COLORS.teal[600], borderRadius: RADIUS.md,
+    padding: 12, alignItems: 'center', marginTop: 4,
+  },
+  saveBtnText:        { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   savedRow:           {
     flexDirection: 'row', alignItems: 'center', gap: 10,

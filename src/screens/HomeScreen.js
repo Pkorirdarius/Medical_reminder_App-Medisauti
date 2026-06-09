@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Animated,
+  ActivityIndicator, Animated, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,7 +26,7 @@ function Badge({ label, type = 'teal' }) {
   );
 }
 
-function MedItem({ med, onSpeak }) {
+function MedItem({ med }) {
   const badgeType = med.stock === 'low' ? 'amber' : 'teal';
   const badgeLabel = med.stock === 'low' ? 'Low stock' : 'Active';
 
@@ -49,6 +49,7 @@ function MedItem({ med, onSpeak }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { highContrast, toggleHighContrast, COLORS: HC } = useHighContrast();
+  const scrollRef = useRef(null);
 
   const [user, setUser]                     = useState({ name: 'Darius' });
   const [prescriptions, setPrescriptions]   = useState([]);
@@ -56,6 +57,7 @@ export default function HomeScreen() {
   const [nextReminder, setNextReminder]     = useState(null);
   const [speaking, setSpeaking]             = useState(false);
   const [loading, setLoading]               = useState(true);
+  const [refreshing, setRefreshing]         = useState(false);
   const [language, setLanguage]             = useState('sw');
 
   useFocusEffect(
@@ -64,8 +66,15 @@ export default function HomeScreen() {
     }, [])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollRef.current) {
+        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+      }
+    }, [])
+  );
+
   async function loadData() {
-    setLoading(true);
     try {
       const [u, meds, adh] = await Promise.all([
         getUser(),
@@ -80,7 +89,13 @@ export default function HomeScreen() {
       console.error('HomeScreen loadData:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }
+
+  function onRefresh() {
+    setRefreshing(true);
+    loadData();
   }
 
   function findNextReminder(meds) {
@@ -129,7 +144,6 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
       <View style={[styles.header, highContrast && { backgroundColor: '#003D2C' }]}>
         <View style={styles.headerRow}>
           <View>
@@ -137,14 +151,12 @@ export default function HomeScreen() {
             <Text style={styles.subGreeting}>Dawa yako ya leo · Your meds today</Text>
           </View>
           <View style={styles.headerRight}>
-            {/* Language toggle */}
             <TouchableOpacity
               style={styles.langToggleBtn}
               onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')}
             >
               <Text style={styles.langToggleText}>{language === 'sw' ? 'EN' : 'SW'}</Text>
             </TouchableOpacity>
-            {/* High contrast toggle */}
             <TouchableOpacity onPress={toggleHighContrast} style={styles.hcToggleBtn}>
               <Text style={{ fontSize: 16 }}>{highContrast ? '🔆' : '🌓'}</Text>
             </TouchableOpacity>
@@ -156,7 +168,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Adherence bar */}
         <View style={styles.adhBox}>
           <View style={styles.adhRow}>
             <Text style={styles.adhLabel}>Uzingativu wa mwezi · Monthly adherence</Text>
@@ -168,70 +179,81 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.teal[400]} />
-      ) : (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-
-          {/* Stat cards */}
-          <View style={styles.statRow}>
-            <View style={[styles.statCard, { backgroundColor: COLORS.teal[50] }]}>
-              <Text style={[styles.statVal, { color: COLORS.teal[600] }]}>{adherence.taken}</Text>
-              <Text style={styles.statLbl}>Doses taken (30d)</Text>
-            </View>
-            <View style={[styles.statCard, { backgroundColor: COLORS.red[50] }]}>
-              <Text style={[styles.statVal, { color: COLORS.red[400] }]}>{adherence.missed}</Text>
-              <Text style={styles.statLbl}>Missed (30d)</Text>
-            </View>
-          </View>
-
-          {/* Next reminder */}
-          {nextReminder && (
-            <View style={[styles.card, styles.nextCard]}>
-              <Text style={styles.cardTitle}>Inayokuja · Next reminder</Text>
-              <View style={styles.nextRow}>
-                <View style={styles.timeBubble}>
-                  <Text style={styles.timeBig}>{formatTime12(nextReminder.nextTime).split(' ')[0]}</Text>
-                  <Text style={styles.timeAmpm}>{formatTime12(nextReminder.nextTime).split(' ')[1]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.medName}>{nextReminder.drugName} {nextReminder.dosage}</Text>
-                  <Text style={styles.medSub}>
-                    {getTimeLabel(nextReminder.nextTime, 'sw')} ·{' '}
-                    {getTimeLabel(nextReminder.nextTime, 'en')}
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak}>
-                  <Text style={styles.speakBtnText}>{speaking ? '🔊' : '▶ Sauti'}</Text>
-                </TouchableOpacity>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.teal[600]]}
+            tintColor={COLORS.teal[600]}
+          />
+        }
+        keyboardShouldPersistTaps="handled"
+      >
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.teal[400]} />
+        ) : (
+          <>
+            <View style={styles.statRow}>
+              <View style={[styles.statCard, { backgroundColor: COLORS.teal[50] }]}>
+                <Text style={[styles.statVal, { color: COLORS.teal[600] }]}>{adherence.taken}</Text>
+                <Text style={styles.statLbl}>Doses taken (30d)</Text>
               </View>
-              {speaking && (
-                <View style={styles.speakingBar}>
-                  <Text style={styles.speakingText}>
-                    🔊 "Ni wakati wa kuchukua dawa yako..."
-                  </Text>
+              <View style={[styles.statCard, { backgroundColor: COLORS.red[50] }]}>
+                <Text style={[styles.statVal, { color: COLORS.red[400] }]}>{adherence.missed}</Text>
+                <Text style={styles.statLbl}>Missed (30d)</Text>
+              </View>
+            </View>
+
+            {nextReminder && (
+              <View style={[styles.card, styles.nextCard]}>
+                <Text style={styles.cardTitle}>Inayokuja · Next reminder</Text>
+                <View style={styles.nextRow}>
+                  <View style={styles.timeBubble}>
+                    <Text style={styles.timeBig}>{formatTime12(nextReminder.nextTime).split(' ')[0]}</Text>
+                    <Text style={styles.timeAmpm}>{formatTime12(nextReminder.nextTime).split(' ')[1]}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.medName}>{nextReminder.drugName} {nextReminder.dosage}</Text>
+                    <Text style={styles.medSub}>
+                      {getTimeLabel(nextReminder.nextTime, 'sw')} ·{' '}
+                      {getTimeLabel(nextReminder.nextTime, 'en')}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak}>
+                    <Text style={styles.speakBtnText}>{speaking ? '🔊' : '▶ Sauti'}</Text>
+                  </TouchableOpacity>
                 </View>
+                {speaking && (
+                  <View style={styles.speakingBar}>
+                    <Text style={styles.speakingText}>
+                      🔊 "Ni wakati wa kuchukua dawa yako..."
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Dawa zote · All medications</Text>
+              {prescriptions.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  Bado hujaongeza dawa. Bonyeza kichupo "Dawa" kuanza.
+                  {'\n'}No meds added yet. Tap the "Dawa" tab to start.
+                </Text>
+              ) : (
+                prescriptions.map((med, i) => (
+                  <MedItem key={med.id || i} med={med} />
+                ))
               )}
             </View>
-          )}
-
-          {/* Medications list */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Dawa zote · All medications</Text>
-            {prescriptions.length === 0 ? (
-              <Text style={styles.emptyText}>
-                Bado hujaongeza dawa. Bonyeza kichupo "Dawa" kuanza.
-                {'\n'}No meds added yet. Tap the "Dawa" tab to start.
-              </Text>
-            ) : (
-              prescriptions.map((med, i) => (
-                <MedItem key={med.id || i} med={med} />
-              ))
-            )}
-          </View>
-
-        </ScrollView>
-      )}
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -263,7 +285,7 @@ const styles = StyleSheet.create({
   progFill:       { height: 6, backgroundColor: '#fff', borderRadius: 3 },
 
   scroll:         { flex: 1 },
-  scrollContent:  { padding: 12, paddingBottom: 30 },
+  scrollContent:  { padding: 12, paddingBottom: 30, flexGrow: 1 },
 
   statRow:        { flexDirection: 'row', gap: 10, marginBottom: 12 },
   statCard:       { flex: 1, borderRadius: RADIUS.md, padding: 12, alignItems: 'center' },

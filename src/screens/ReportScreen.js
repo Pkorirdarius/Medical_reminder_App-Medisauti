@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Animated, Linking,
+  Alert, ActivityIndicator, Animated, Linking, RefreshControl,
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -153,6 +153,8 @@ export default function ReportScreen() {
   const [language, setLanguage]             = useState('sw');
   const [exporting, setExporting]           = useState(false);
   const [lastReportUri, setLastReportUri]   = useState(null);
+  const [refreshing, setRefreshing]         = useState(false);
+  const scrollRef = useRef(null);
 
   const pulse = React.useRef(new Animated.Value(1)).current;
   React.useEffect(() => {
@@ -166,6 +168,14 @@ export default function ReportScreen() {
 
   useFocusEffect(
     useCallback(() => { loadData(); }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (scrollRef.current) {
+        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+      }
+    }, [])
   );
 
   async function loadData() {
@@ -185,6 +195,12 @@ export default function ReportScreen() {
     setPerMed(pm);
     setPatterns(pat);
     setTrend(tr);
+    setRefreshing(false);
+  }
+
+  function onRefresh() {
+    setRefreshing(true);
+    loadData();
   }
 
   async function generatePDF() {
@@ -309,9 +325,19 @@ export default function ReportScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 90 }]}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#00513f']}
+            tintColor={'#00513f'}
+          />
+        }
       >
         {/* Hero */}
         <View style={styles.heroSection}>

@@ -159,37 +159,39 @@ export default function AuthScreen({ onAuthSuccess }) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'android' ? 'height' : 'padding'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? insets.top + 50 : 0}
     >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.appName}>MEDISAUTI</Text>
-          <Text style={styles.tagline}>
-            {language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}
-          </Text>
-        </View>
-
-        {/* Language toggle */}
-        <View style={styles.langRow}>
-          {['sw', 'en'].map(l => (
-            <TouchableOpacity
-              key={l}
-              style={[styles.langBtn, language === l && styles.langBtnActive]}
-              onPress={() => setLanguage(l)}
-            >
-              <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
-                {l === 'sw' ? 'Kiswahili' : 'English'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
+      <View style={[styles.container]}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          bounces={false}
         >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.appName}>MEDISAUTI</Text>
+            <Text style={styles.tagline}>
+              {language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}
+            </Text>
+          </View>
+
+          {/* Language toggle */}
+          <View style={styles.langRow}>
+            {['sw', 'en'].map(l => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.langBtn, language === l && styles.langBtnActive]}
+                onPress={() => setLanguage(l)}
+              >
+                <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
+                  {l === 'sw' ? 'Kiswahili' : 'English'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
           {mode === 'register' ? (
             /* ── Registration ── */
             <View style={styles.card}>
@@ -381,7 +383,7 @@ const styles = StyleSheet.create({
   langBtnTextActive: { color: COLORS.teal[600], fontWeight: '700' },
 
   scroll:         { flex: 1 },
-  scrollContent:  { padding: 20, paddingBottom: 40 },
+  scrollContent:  { padding: 20, paddingBottom: 120, flexGrow: 1 },
 
   card:           {
     backgroundColor: '#fff', borderRadius: RADIUS.xl,
