@@ -11,7 +11,7 @@ import { saveUser, getUser, getIsRegistered } from '../utils/storage';
 
 const PIN_LENGTH = 4;
 
-export default function AuthScreen({ onAuthSuccess }) {
+export default function AuthScreen({ onAuthSuccess, route }) {
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,10 @@ export default function AuthScreen({ onAuthSuccess }) {
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       setBiometricAvailable(hasBiometric && enrolled);
 
-      if (registered) {
+      const initialMode = route?.params?.initialMode;
+      if (initialMode) {
+        setMode(initialMode);
+      } else if (registered) {
         setMode('login');
       } else {
         setMode('register');

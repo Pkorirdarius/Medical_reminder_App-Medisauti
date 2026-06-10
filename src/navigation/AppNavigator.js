@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, ActivityIndicator } from 'react-native';
 
 import { HighContrastProvider } from '../utils/HighContrastContext';
+import LandingScreen from '../screens/LandingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
 import PrescriptionScreen from '../screens/PrescriptionScreen';
@@ -93,9 +94,12 @@ export default function AppNavigator() {
     <HighContrastProvider>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!authenticated ? (
-          <Stack.Screen name="Auth">
-            {() => <AuthScreen onAuthSuccess={() => setAuthenticated(true)} />}
-          </Stack.Screen>
+          <>
+            <Stack.Screen name="Landing" component={LandingScreen} />
+            <Stack.Screen name="Auth">
+              {props => <AuthScreen {...props} onAuthSuccess={() => setAuthenticated(true)} />}
+            </Stack.Screen>
+          </>
         ) : (
           <Stack.Screen name="Main" component={MainTabs} />
         )}
