@@ -1,13 +1,15 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Alert, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SHADOW } from '../utils/constants';
+import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, logDose } from '../utils/storage';
+import { useHighContrast } from '../utils/HighContrastContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
 function timeToMinutes(t) {
@@ -15,267 +17,257 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
-function buildTodayReminders(prescriptions) {
+function buildReminders(meds) {
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const reminders = [];
-
-  for (const med of prescriptions) {
+  const list = [];
+  for (const med of meds || []) {
     for (const time of med.times || []) {
       const tMin = timeToMinutes(time);
-      reminders.push({
-        key:            `${med.id}-${time}`,
+      list.push({
+        key: `${med.id}-${time}`,
         prescriptionId: med.id,
-        drugName:       med.drugName,
-        dosage:         med.dosage,
-        notes:          med.notes || '',
+        drugName: med.dosage ? `${med.drugName} ${med.dosage}` : med.drugName,
+        dosage: med.dosage,
+        notes: med.notes,
         time,
-        isPast:         tMin < nowMin,
-        isCurrent:      Math.abs(tMin - nowMin) <= 30,
+        tMin,
+        isCurrent: Math.abs(tMin - nowMin) <= 30 && tMin <= nowMin + 30,
+        isPast: tMin < nowMin - 30,
       });
     }
   }
+  list.sort((a, b) => a.tMin - b.tMin);
+  return list;
+}
 
-  reminders.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  return reminders;
+function ReminderCard({ item, doseStatus, onAction, language }) {
+  const status = doseStatus[item.key];
+  const isTaken = status === 'taken';
+  const isSnoozed = status === 'snoozed';
+  const isMissed = status === 'missed';
+
+  return (
+    <View style={[
+      styles.remCard,
+      item.isCurrent && styles.remCardCurrent,
+      isPast && !status && styles.remCardPast,
+      (isTaken || isMissed) && { opacity: 0.55 },
+    ]}>
+      <TouchableOpacity style={styles.remCardBody} activeOpacity={0.7}>
+        <View style={styles.remTimeCol}>
+          <Text style={styles.remTime}>{formatTime12(item.time).split(' ')[0]}</Text>
+          <Text style={styles.remAmpm}>{formatTime12(item.time).split(' ')[1]}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.remDrug}>{item.drugName}</Text>
+          <Text style={styles.remPeriod}>{getTimeLabel(item.time, language)}</Text>
+          {item.notes ? <Text style={styles.remNotes}>{item.notes}</Text> : null}
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.remActions}>
+        {!status ? (
+          <>
+            <TouchableOpacity style={styles.actionTaken} onPress={() => onAction(item.key, 'taken', item)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="check" size={18} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionSnooze} onPress={() => onAction(item.key, 'snoozed', item)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.amber[800]} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionMissed} onPress={() => onAction(item.key, 'missed', item)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="close" size={18} color="#fff" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={[styles.statusChip, {
+            backgroundColor: isTaken ? COLORS.green[50] : isSnoozed ? COLORS.amber[50] : COLORS.red[50],
+          }]}>
+            <MaterialCommunityIcons
+              name={isTaken ? 'check-circle' : isSnoozed ? 'clock-outline' : 'close-circle'}
+              size={14}
+              color={isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400]}
+            />
+            <Text style={[styles.statusText, { color: isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400] }]}>
+              {isTaken ? 'Taken' : isSnoozed ? 'Snoozed' : 'Missed'}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
 }
 
 export default function RemindersScreen() {
   const insets = useSafeAreaInsets();
+  const { toggleHighContrast } = useHighContrast();
   const scrollRef = useRef(null);
 
-  const [reminders, setReminders]   = useState([]);
-  const [doseStatus, setDoseStatus] = useState({});
-  const [language, setLanguage]     = useState('sw');
+  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [language, setLanguage] = useState('sw');
+  const [doseStatus, setDoseStatus] = useState({});
 
-  useFocusEffect(
-    useCallback(() => { load(); }, [])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => {
+    if (scrollRef.current) setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+  }, []));
 
-  useFocusEffect(
-    useCallback(() => {
-      if (scrollRef.current) {
-        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
-      }
-    }, [])
-  );
-
-  async function load() {
-    const meds = await getPrescriptions();
-    setReminders(buildTodayReminders(meds));
-    setRefreshing(false);
+  async function loadData() {
+    try {
+      const meds = await getPrescriptions();
+      const list = buildReminders(meds);
+      setReminders(list);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); setRefreshing(false); }
   }
 
-  function onRefresh() {
-    setRefreshing(true);
-    load();
-  }
+  function onRefresh() { setRefreshing(true); loadData(); }
 
-  async function handleAction(reminder, action) {
-    setDoseStatus(s => ({ ...s, [reminder.key]: action }));
-
+  async function handleAction(key, action, item) {
+    setDoseStatus(s => ({ ...s, [key]: action }));
     const scheduledTime = new Date();
-    const [h, m] = reminder.time.split(':').map(Number);
+    const [h, m] = item.time.split(':').map(Number);
     scheduledTime.setHours(h, m, 0, 0);
 
-    await logDose(reminder.prescriptionId, action, scheduledTime.toISOString());
+    await logDose(item.prescriptionId, action, scheduledTime.toISOString());
 
     if (action === 'taken') {
-      speakReminder(
-        reminder.drugName,
-        reminder.dosage,
-        getTimeLabel(reminder.time, language),
-        language
-      );
-    }
-
-    if (action === 'snoozed') {
+      const label = getTimeLabel(item.time, language);
+      speakReminder(item.drugName.split(' ')[0], item.dosage || '', label, 'sw');
+    } else if (action === 'snoozed') {
       Alert.alert(
-        language === 'sw' ? '⏰ Imewekwa tena' : '⏰ Snoozed',
-        language === 'sw'
-          ? 'Tutakukumbusha baada ya dakika 15.'
-          : 'We will remind you again in 15 minutes.'
+        language === 'sw' ? 'Kikumbusho' : 'Reminder',
+        language === 'sw' ? 'Tutakukumbusha tena baada ya dakika 15.' : 'We will remind you again in 15 minutes.'
       );
     }
   }
 
-  const past    = reminders.filter(r => r.isPast);
-  const upcoming = reminders.filter(r => !r.isPast);
-
-  function ReminderCard({ r }) {
-    const status = doseStatus[r.key];
-
-    const statusColors = {
-      taken:   { bg: COLORS.green[50],  border: COLORS.green[400], label: language === 'sw' ? '✓ Imechukuliwa' : '✓ Taken',  labelColor: COLORS.green[400] },
-      missed:  { bg: COLORS.red[50],    border: COLORS.red[400],   label: language === 'sw' ? '✗ Imekosekana'  : '✗ Missed', labelColor: COLORS.red[400]   },
-      snoozed: { bg: COLORS.amber[50],  border: COLORS.amber[400], label: language === 'sw' ? '⏰ Imepigwa'    : '⏰ Snoozed',labelColor: COLORS.amber[400] },
-    };
-
-    const sc = status ? statusColors[status] : null;
-
-    return (
-      <View style={[
-        styles.rCard,
-        r.isCurrent && styles.rCardActive,
-        sc && { backgroundColor: sc.bg, borderColor: sc.border },
-      ]}>
-        <View style={styles.rLeft}>
-          <Text style={[styles.rTime, r.isCurrent && { color: COLORS.teal[600] }]}>
-            {formatTime12(r.time)}
-          </Text>
-          <Text style={styles.rPeriod}>{getTimeLabel(r.time, language)}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.rName}>{r.drugName} {r.dosage}</Text>
-          {r.notes ? <Text style={styles.rSub}>{r.notes}</Text> : null}
-        </View>
-        {sc ? (
-          <Text style={[styles.badge, { color: sc.labelColor }]}>{sc.label}</Text>
-        ) : (
-          <View style={styles.actionBtns}>
-            <TouchableOpacity style={[styles.aBtn, styles.aBtnTaken]} onPress={() => handleAction(r, 'taken')}>
-              <Text style={styles.aBtnText}>✓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.aBtn, styles.aBtnSnooze]} onPress={() => handleAction(r, 'snoozed')}>
-              <Text style={styles.aBtnText}>⏰</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.aBtn, styles.aBtnMiss]} onPress={() => handleAction(r, 'missed')}>
-              <Text style={styles.aBtnText}>✗</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  }
+  const upcoming = reminders.filter(r => !r.isPast && !doseStatus[r.key]);
+  const earlier = reminders.filter(r => r.isPast || doseStatus[r.key]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>⏰ {language === 'sw' ? 'Vikumbusho · Reminders' : 'Reminders'}</Text>
-        <Text style={styles.headerSub}>
-          {new Date().toLocaleDateString('sw-KE', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </Text>
-      </View>
-
-      <View style={styles.langRow}>
-        {['sw', 'en'].map(l => (
-          <TouchableOpacity key={l} style={[styles.langBtn, language === l && styles.langBtnActive]} onPress={() => setLanguage(l)}>
-            <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
-              {l === 'sw' ? 'Kiswahili' : 'English'}
-            </Text>
+        <View style={styles.headerLeft}>
+          <MaterialCommunityIcons name="bell-ring-outline" size={28} color={COLORS.primary} />
+          <Text style={styles.headerTitle}>Vikumbusho</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+            <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
-        ))}
+          <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
+            <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        contentContainerStyle={{ padding: 12, paddingBottom: 40, flexGrow: 1 }}
-        showsVerticalScrollIndicator={true}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.teal[600]]}
-            tintColor={COLORS.teal[600]}
-          />
-        }
-      >
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: COLORS.green[400] }]} />
-            <Text style={styles.legendText}>{language === 'sw' ? 'Imechukuliwa' : 'Taken'}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: COLORS.red[400] }]} />
-            <Text style={styles.legendText}>{language === 'sw' ? 'Imekosekana' : 'Missed'}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: COLORS.amber[400] }]} />
-            <Text style={styles.legendText}>{language === 'sw' ? 'Imepigwa' : 'Snoozed'}</Text>
-          </View>
-        </View>
-
-        <View style={[styles.legend, { marginBottom: 14 }]}>
-          <Text style={{ fontSize: 11, color: COLORS.text.secondary }}>
-            {language === 'sw'
-              ? '✓ = Imechukuliwa  ⏰ = Subiri dakika 15  ✗ = Imekosekana'
-              : '✓ = Taken  ⏰ = Snooze 15m  ✗ = Missed'}
-          </Text>
-        </View>
-
-        {upcoming.length > 0 && (
-          <>
-            <Text style={styles.sectionLabel}>{language === 'sw' ? 'Zinakuja · Upcoming' : 'Upcoming'}</Text>
-            {upcoming.map(r => <ReminderCard key={r.key} r={r} />)}
-          </>
-        )}
-
-        {past.length > 0 && (
-          <>
-            <Text style={[styles.sectionLabel, { marginTop: 16 }]}>
-              {language === 'sw' ? 'Zilizopita · Past' : 'Earlier today'}
-            </Text>
-            {[...past].reverse().map(r => (
-              <View key={r.key} style={{ opacity: 0.65 }}>
-                <ReminderCard r={r} />
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 60 }} color={COLORS.primary} />
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+        >
+          {/* Legend */}
+          <View style={styles.legend}>
+            {[
+              { icon: 'check-circle', label: 'Taken', color: COLORS.green[400] },
+              { icon: 'clock-outline', label: 'Snoozed', color: COLORS.amber[400] },
+              { icon: 'close-circle', label: 'Missed', color: COLORS.red[400] },
+            ].map(({ icon, label, color }) => (
+              <View key={label} style={styles.legendItem}>
+                <MaterialCommunityIcons name={icon} size={14} color={color} />
+                <Text style={[styles.legendText, { color }]}>{label}</Text>
               </View>
             ))}
-          </>
-        )}
-
-        {reminders.length === 0 && (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>💊</Text>
-            <Text style={styles.emptyText}>
-              {language === 'sw'
-                ? 'Hakuna vikumbusho bado.\nOngeza dawa yako kwenye kichupo cha Dawa.'
-                : 'No reminders yet.\nAdd your prescriptions in the Dawa tab.'}
-            </Text>
           </View>
-        )}
-      </ScrollView>
+
+          {reminders.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="bell-off-outline" size={56} color={COLORS.outline} />
+              <Text style={styles.emptyTitle}>{language === 'sw' ? 'Hakuna vikumbusho' : 'No reminders'}</Text>
+              <Text style={styles.emptySub}>{language === 'sw' ? 'Ongeza dawa katika kichupo cha "Dawa" ili kupata vikumbusho.' : 'Add medications in the "Dawa" tab to get reminders.'}</Text>
+            </View>
+          ) : (
+            <>
+              {upcoming.length > 0 && (
+                <>
+                  <Text style={styles.sectionLabel}>Upcoming</Text>
+                  {upcoming.map(r => (
+                    <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
+                  ))}
+                </>
+              )}
+              <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Earlier today</Text>
+              {earlier.length === 0 ? (
+                <Text style={styles.noEarlier}>{language === 'sw' ? 'Hakuna vikumbusho vya awali.' : 'No earlier reminders.'}</Text>
+              ) : (
+                earlier.map(r => (
+                  <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
+                ))
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:          { flex: 1, backgroundColor: COLORS.background },
-  header:             { backgroundColor: COLORS.teal[600], padding: 16, paddingBottom: 18 },
-  headerTitle:        { fontSize: 18, fontWeight: '600', color: '#fff' },
-  headerSub:          { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  langRow:            { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 0.5, borderColor: '#e0e0e0' },
-  langBtn:            { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  langBtnActive:      { borderBottomWidth: 2, borderBottomColor: COLORS.teal[400] },
-  langBtnText:        { fontSize: 13, color: COLORS.text.secondary },
-  langBtnTextActive:  { color: COLORS.teal[600], fontWeight: '600' },
-  scroll:             { flex: 1 },
-  sectionLabel:       { fontSize: 11, fontWeight: '600', color: COLORS.text.secondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 },
-  legend:             { flexDirection: 'row', gap: 14, marginBottom: 6 },
-  legendItem:         { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot:          { width: 8, height: 8, borderRadius: 4 },
-  legendText:         { fontSize: 11, color: COLORS.text.secondary },
-  rCard:              {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#fff', borderRadius: RADIUS.lg,
-    padding: 12, marginBottom: 8, borderWidth: 0.5, borderColor: '#e0e0e0', ...SHADOW.sm,
+  screen:         { flex: 1, backgroundColor: COLORS.background },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: COLORS.background,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+    zIndex: 10,
   },
-  rCardActive:        { borderColor: COLORS.teal[100], backgroundColor: COLORS.teal[50] },
-  rLeft:              { minWidth: 54, alignItems: 'center' },
-  rTime:              { fontSize: 14, fontWeight: '600', color: COLORS.text.primary },
-  rPeriod:            { fontSize: 10, color: COLORS.text.secondary },
-  rName:              { fontSize: 14, fontWeight: '500', color: COLORS.text.primary },
-  rSub:               { fontSize: 12, color: COLORS.text.secondary },
-  badge:              { fontSize: 11, fontWeight: '600' },
-  actionBtns:         { flexDirection: 'row', gap: 4 },
-  aBtn:               { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  aBtnTaken:          { backgroundColor: COLORS.green[400] },
-  aBtnSnooze:         { backgroundColor: COLORS.amber[400] },
-  aBtnMiss:           { backgroundColor: COLORS.red[400] },
-  aBtnText:           { color: '#fff', fontSize: 12, fontWeight: '700' },
-  emptyBox:           { alignItems: 'center', marginTop: 60 },
-  emptyIcon:          { fontSize: 48, marginBottom: 12 },
-  emptyText:          { fontSize: 14, color: COLORS.text.secondary, textAlign: 'center', lineHeight: 22 },
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5 },
+  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
+
+  scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
+
+  legend:         { flexDirection: 'row', gap: 16, marginBottom: 16 },
+  legendItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendText:     { fontSize: 11, fontFamily: FONT.body },
+
+  sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
+
+  remCard: {
+    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 14,
+    marginBottom: 10, flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+  },
+  remCardCurrent: { borderLeftWidth: 4, borderLeftColor: COLORS.primary },
+  remCardPast:    { opacity: 0.65 },
+  remCardBody:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  remTimeCol:     { alignItems: 'center' },
+  remTime:        { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, letterSpacing: -0.5 },
+  remAmpm:        { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline, marginTop: -1 },
+  remDrug:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
+  remPeriod:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 1 },
+  remNotes:       { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 4, fontStyle: 'italic' },
+
+  remActions:     { flexDirection: 'row', gap: 6, marginLeft: 8 },
+  actionTaken:    { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.green[400], alignItems: 'center', justifyContent: 'center' },
+  actionSnooze:   { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.amber[50], alignItems: 'center', justifyContent: 'center' },
+  actionMissed:   { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.red[400], alignItems: 'center', justifyContent: 'center' },
+
+  statusChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
+  statusText:     { fontSize: 11, fontFamily: FONT.bodySemiBold },
+
+  emptyState:     { alignItems: 'center', paddingVertical: 60 },
+  emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginTop: 16 },
+  emptySub:       { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
+  noEarlier:      { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', paddingVertical: 20 },
 });

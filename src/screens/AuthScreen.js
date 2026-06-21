@@ -6,7 +6,8 @@ import {
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, RADIUS, SHADOW } from '../utils/constants';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered } from '../utils/storage';
 
 const PIN_LENGTH = 4;
@@ -40,32 +41,21 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     ).start();
   }, []);
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, []);
+  useEffect(() => { checkAuthStatus(); }, []);
 
   async function checkAuthStatus() {
     try {
       const registered = await getIsRegistered();
       setIsRegistered(registered);
-
       const hasBiometric = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       setBiometricAvailable(hasBiometric && enrolled);
-
       const initialMode = route?.params?.initialMode;
-      if (initialMode) {
-        setMode(initialMode);
-      } else if (registered) {
-        setMode('login');
-      } else {
-        setMode('register');
-      }
-    } catch (e) {
-      console.error('checkAuthStatus:', e);
-    } finally {
-      setLoading(false);
-    }
+      if (initialMode) setMode(initialMode);
+      else if (registered) setMode('login');
+      else setMode('register');
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }
 
   async function handleBiometricLogin() {
@@ -82,9 +72,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         );
         onAuthSuccess();
       }
-    } catch (e) {
-      console.error('Biometric error:', e);
-    }
+    } catch (e) { console.error(e); }
   }
 
   async function handleRegister() {
@@ -102,269 +90,102 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       );
       return;
     }
-
     setRegistering(true);
     try {
-      const user = {
-        name: name.trim(),
-        phone: phone.trim(),
-        age: parseInt(age.trim(), 10),
-        condition: condition.trim(),
-        pin,
-        createdAt: new Date().toISOString(),
-      };
+      const user = { name: name.trim(), phone: phone.trim(), age: parseInt(age.trim(), 10), condition: condition.trim(), pin, createdAt: new Date().toISOString() };
       await saveUser(user);
-      Alert.alert(
-        language === 'sw' ? '✅ Umesajiliwa' : '✅ Registered',
-        language === 'sw' ? `Karibu ${user.name}!` : `Welcome ${user.name}!`
-      );
+      Alert.alert(language === 'sw' ? '✅ Umesajiliwa' : '✅ Registered', language === 'sw' ? `Karibu ${user.name}!` : `Welcome ${user.name}!`);
       onAuthSuccess();
-    } catch (e) {
-      Alert.alert('Error', e.message);
-    } finally {
-      setRegistering(false);
-    }
+    } catch (e) { Alert.alert('Error', e.message); }
+    finally { setRegistering(false); }
   }
 
   async function handleLogin() {
     if (loginPin.length !== PIN_LENGTH) {
-      Alert.alert(
-        language === 'sw' ? 'PIN si sahihi' : 'Invalid PIN',
-        language === 'sw' ? `Tafadhali ingiza PIN yenye tarakimu ${PIN_LENGTH}.` : `Please enter your ${PIN_LENGTH}-digit PIN.`
-      );
+      Alert.alert(language === 'sw' ? 'PIN si sahihi' : 'Invalid PIN', language === 'sw' ? `Tafadhali ingiza PIN yenye tarakimu ${PIN_LENGTH}.` : `Please enter your ${PIN_LENGTH}-digit PIN.`);
       return;
     }
-
     try {
       const user = await getUser();
-      if (user && user.pin === loginPin) {
-        onAuthSuccess();
-      } else {
-        Alert.alert(
-          language === 'sw' ? 'PIN si sahihi' : 'Wrong PIN',
-          language === 'sw' ? 'PIN ulioingiza hailingani. Tafadhali jaribu tena.' : 'The PIN you entered does not match. Please try again.'
-        );
-      }
-    } catch (e) {
-      Alert.alert('Error', e.message);
-    }
+      if (user && user.pin === loginPin) onAuthSuccess();
+      else Alert.alert(language === 'sw' ? 'PIN si sahihi' : 'Wrong PIN', language === 'sw' ? 'PIN ulioingiza hailingani. Tafadhali jaribu tena.' : 'The PIN you entered does not match.');
+    } catch (e) { Alert.alert('Error', e.message); }
   }
 
   if (loading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={styles.appName}>MEDISAUTI</Text>
-        <ActivityIndicator size="large" color={COLORS.teal[400]} />
+      <View style={[styles.screen, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 28, fontFamily: FONT.headline, color: '#fff' }}>MediSauti</Text>
+        <ActivityIndicator size="large" color="#fff" style={{ marginTop: 16 }} />
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'android' ? 'height' : 'padding'}
-      keyboardVerticalOffset={Platform.OS === 'android' ? insets.top + 50 : 0}
-    >
-      <View style={[styles.container]}>
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
-          bounces={false}
-        >
-          {/* Header */}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'android' ? 'height' : 'padding'} keyboardVerticalOffset={Platform.OS === 'android' ? insets.top + 50 : 0}>
+      <View style={styles.screen}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={true} bounces={false}>
           <View style={styles.header}>
-            <Text style={styles.appName}>MEDISAUTI</Text>
-            <Text style={styles.tagline}>
-              {language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}
-            </Text>
+            <MaterialCommunityIcons name="heart-pulse" size={40} color="#fff" />
+            <Text style={styles.appName}>MediSauti</Text>
+            <Text style={styles.tagline}>{language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}</Text>
           </View>
 
-          {/* Language toggle */}
           <View style={styles.langRow}>
             {['sw', 'en'].map(l => (
-              <TouchableOpacity
-                key={l}
-                style={[styles.langBtn, language === l && styles.langBtnActive]}
-                onPress={() => setLanguage(l)}
-              >
-                <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
-                  {l === 'sw' ? 'Kiswahili' : 'English'}
-                </Text>
+              <TouchableOpacity key={l} style={[styles.langBtn, language === l && styles.langBtnActive]} onPress={() => setLanguage(l)}>
+                <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>{l === 'sw' ? 'Kiswahili' : 'English'}</Text>
               </TouchableOpacity>
             ))}
           </View>
+
           {mode === 'register' ? (
-            /* ── Registration ── */
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {language === 'sw' ? '📝 Jisajili · Register' : '📝 Register'}
-              </Text>
-              <Text style={styles.cardSub}>
-                {language === 'sw'
-                  ? 'Tafadhali jaza taarifa zako za matibabu.'
-                  : 'Please fill in your medical information.'}
-              </Text>
+              <Text style={styles.cardTitle}>{language === 'sw' ? 'Jisajili' : 'Register'}</Text>
+              <Text style={styles.cardSub}>{language === 'sw' ? 'Tafadhali jaza taarifa zako za matibabu.' : 'Please fill in your medical information.'}</Text>
 
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Jina kamili' : 'Full name'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. Darius Kamau"
-                  placeholderTextColor={COLORS.text.hint}
-                />
-              </View>
+              <Input label={language === 'sw' ? 'Jina kamili' : 'Full name'} value={name} onChangeText={setName} placeholder="e.g. Darius Kamau" />
+              <Input label={language === 'sw' ? 'Nambari ya simu' : 'Phone number'} value={phone} onChangeText={setPhone} placeholder="e.g. 0712345678" keyboardType="phone-pad" />
+              <Input label={language === 'sw' ? 'Umri' : 'Age'} value={age} onChangeText={setAge} placeholder="e.g. 45" keyboardType="number-pad" />
+              <Input label={language === 'sw' ? 'Hali ya kiafya' : 'Medical condition'} value={condition} onChangeText={setCondition} placeholder="e.g. Diabetes" />
+              <Input label={language === 'sw' ? 'Weka PIN (tarakimu 4)' : 'Set PIN (4 digits)'} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <Input label={language === 'sw' ? 'Thibitisha PIN' : 'Confirm PIN'} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Nambari ya simu' : 'Phone number'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="e.g. 0712345678"
-                  placeholderTextColor={COLORS.text.hint}
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Umri' : 'Age'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={age}
-                  onChangeText={setAge}
-                  placeholder="e.g. 45"
-                  placeholderTextColor={COLORS.text.hint}
-                  keyboardType="number-pad"
-                />
-              </View>
-
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Hali ya kiafya' : 'Medical condition'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={condition}
-                  onChangeText={setCondition}
-                  placeholder="e.g. Diabetes"
-                  placeholderTextColor={COLORS.text.hint}
-                />
-              </View>
-
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Weka PIN (tarakimu 4)' : 'Set PIN (4 digits)'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={pin}
-                  onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))}
-                  placeholder="****"
-                  placeholderTextColor={COLORS.text.hint}
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  maxLength={PIN_LENGTH}
-                />
-              </View>
-
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'Thibitisha PIN' : 'Confirm PIN'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={confirmPin}
-                  onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))}
-                  placeholder="****"
-                  placeholderTextColor={COLORS.text.hint}
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  maxLength={PIN_LENGTH}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleRegister}
-                disabled={registering}
-              >
-                {registering ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.primaryBtnText}>
-                    {language === 'sw' ? '✅ Jisajili' : '✅ Register'}
-                  </Text>
-                )}
+              <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={registering}>
+                {registering ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{language === 'sw' ? 'Jisajili' : 'Register'}</Text>}
               </TouchableOpacity>
             </View>
           ) : (
-            /* ── Login ── */
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {language === 'sw' ? '🔐 Ingia · Login' : '🔐 Login'}
-              </Text>
-              <Text style={styles.cardSub}>
-                {language === 'sw'
-                  ? 'Ingiza PIN yako au tumia alama ya uso / kidole.'
-                  : 'Enter your PIN or use face/fingerprint to continue.'}
-              </Text>
+              <Text style={styles.cardTitle}>{language === 'sw' ? 'Ingia' : 'Login'}</Text>
+              <Text style={styles.cardSub}>{language === 'sw' ? 'Ingiza PIN yako au tumia alama ya uso / kidole.' : 'Enter your PIN or use face/fingerprint to continue.'}</Text>
 
-              {/* Biometric button */}
               {biometricAvailable && (
-                <TouchableOpacity
-                  style={styles.biometricBtn}
-                  onPress={handleBiometricLogin}
-                >
-                  <Animated.Text style={[styles.biometricIcon, { transform: [{ scale: pulse }] }]}>
-                    {Platform.OS === 'ios' ? '😀' : '🖐️'}
-                  </Animated.Text>
-                  <Text style={styles.biometricText}>
-                    {language === 'sw' ? 'Tumia alama ya uso / kidole' : 'Use face / fingerprint'}
-                  </Text>
+                <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
+                  <Animated.View style={{ transform: [{ scale: pulse }] }}>
+                    <MaterialCommunityIcons name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'} size={48} color={COLORS.primary} />
+                  </Animated.View>
+                  <Text style={styles.biometricText}>{language === 'sw' ? 'Tumia alama ya uso / kidole' : 'Use face / fingerprint'}</Text>
                 </TouchableOpacity>
               )}
 
-              {/* Divider */}
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>
-                  {language === 'sw' ? 'AU ingiza PIN' : 'OR enter PIN'}
-                </Text>
+                <Text style={styles.dividerText}>{language === 'sw' ? 'AU ingiza PIN' : 'OR enter PIN'}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              <View style={styles.inputRow}>
-                <Text style={styles.label}>{language === 'sw' ? 'PIN yako' : 'Your PIN'}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={loginPin}
-                  onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))}
-                  placeholder="****"
-                  placeholderTextColor={COLORS.text.hint}
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  maxLength={PIN_LENGTH}
-                />
-              </View>
+              <Input label={language === 'sw' ? 'PIN yako' : 'Your PIN'} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
               <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
-                <Text style={styles.primaryBtnText}>
-                  {language === 'sw' ? '🔓 Ingia' : '🔓 Login'}
-                </Text>
+                <Text style={styles.primaryBtnText}>{language === 'sw' ? 'Ingia' : 'Login'}</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Toggle between register/login */}
           {isRegistered && mode === 'login' && (
-            <TouchableOpacity
-              style={styles.switchBtn}
-              onPress={() => {
-                setIsRegistered(false);
-                setMode('register');
-              }}
-            >
-              <Text style={styles.switchBtnText}>
-                {language === 'sw' ? 'Sajili mtumiaji mpya' : 'Register a new user'}
-              </Text>
+            <TouchableOpacity style={styles.switchBtn} onPress={() => { setIsRegistered(false); setMode('register'); }}>
+              <Text style={styles.switchBtnText}>{language === 'sw' ? 'Sajili mtumiaji mpya' : 'Register a new user'}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -373,53 +194,59 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   );
 }
 
+function Input({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry }) {
+  return (
+    <View style={styles.inputRow}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        style={styles.input}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={COLORS.outline}
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: COLORS.teal[600] },
+  screen:         { flex: 1, backgroundColor: COLORS.primary },
   header:         { alignItems: 'center', paddingVertical: 30 },
-  appName:        { fontSize: 32, fontWeight: '900', color: '#fff', letterSpacing: 1 },
-  tagline:        { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+  appName:        { fontSize: 32, fontFamily: FONT.headline, color: '#fff', letterSpacing: -0.5, marginTop: 8 },
+  tagline:        { fontSize: 13, fontFamily: FONT.body, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
 
-  langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 20, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: 8 },
-  langBtn:        { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  langBtnActive:  { backgroundColor: COLORS.teal[50] },
-  langBtnText:    { fontSize: 13, color: COLORS.text.secondary, fontWeight: '500' },
-  langBtnTextActive: { color: COLORS.teal[600], fontWeight: '700' },
+  langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 20, borderRadius: RADIUS.xl, overflow: 'hidden', marginBottom: 8, alignSelf: 'center' },
+  langBtn:        { paddingHorizontal: 24, paddingVertical: 10, alignItems: 'center' },
+  langBtnActive:  { backgroundColor: COLORS.primaryFixed + '40' },
+  langBtnText:    { fontSize: 13, fontFamily: FONT.bodyMedium },
+  langBtnTextActive: { color: COLORS.primary, fontWeight: '700' },
 
-  scroll:         { flex: 1 },
   scrollContent:  { padding: 20, paddingBottom: 120, flexGrow: 1 },
 
-  card:           {
-    backgroundColor: '#fff', borderRadius: RADIUS.xl,
-    padding: 24, marginBottom: 16, ...SHADOW.sm,
+  card: {
+    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xxl,
+    padding: 24, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8,
   },
-  cardTitle:      { fontSize: 18, fontWeight: '700', color: COLORS.text.primary, marginBottom: 4 },
-  cardSub:        { fontSize: 13, color: COLORS.text.secondary, marginBottom: 20, lineHeight: 18 },
+  cardTitle:      { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginBottom: 4 },
+  cardSub:        { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginBottom: 20, lineHeight: 18 },
 
   inputRow:       { marginBottom: 14 },
-  label:          { fontSize: 12, fontWeight: '600', color: COLORS.text.secondary, marginBottom: 4 },
-  input:          {
-    borderWidth: 0.5, borderColor: '#ccc', borderRadius: RADIUS.md,
-    padding: 12, fontSize: 15, color: COLORS.text.primary,
-    backgroundColor: COLORS.background,
-  },
+  label:          { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, marginBottom: 4 },
+  input:          { backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.md, padding: 12, fontSize: 15, fontFamily: FONT.body, color: COLORS.onSurface, borderWidth: 1, borderColor: COLORS.surfaceHigh },
 
-  primaryBtn:     {
-    backgroundColor: COLORS.teal[600], borderRadius: RADIUS.md,
-    padding: 14, alignItems: 'center', marginTop: 6,
-  },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryBtn:     { backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, padding: 14, alignItems: 'center', marginTop: 6, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontFamily: FONT.bold },
 
-  biometricBtn:   {
-    alignItems: 'center', padding: 20, marginBottom: 8,
-    backgroundColor: COLORS.teal[50], borderRadius: RADIUS.lg,
-  },
-  biometricIcon:  { fontSize: 48, marginBottom: 8 },
-  biometricText:  { fontSize: 14, fontWeight: '600', color: COLORS.teal[600] },
+  biometricBtn:   { alignItems: 'center', padding: 20, marginBottom: 8, backgroundColor: COLORS.primaryFixed + '25', borderRadius: RADIUS.xl },
+  biometricText:  { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.primary, marginTop: 8 },
 
   divider:        { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
-  dividerLine:    { flex: 1, height: 0.5, backgroundColor: '#ccc' },
-  dividerText:    { fontSize: 12, color: COLORS.text.secondary, marginHorizontal: 10 },
+  dividerLine:    { flex: 1, height: 0.5, backgroundColor: COLORS.surfaceHigh },
+  dividerText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, marginHorizontal: 10 },
 
   switchBtn:      { alignSelf: 'center', padding: 12 },
-  switchBtnText:  { fontSize: 13, color: '#fff', fontWeight: '500', textDecorationLine: 'underline' },
+  switchBtnText:  { fontSize: 13, fontFamily: FONT.bodyMedium, textDecorationLine: 'underline' },
 });

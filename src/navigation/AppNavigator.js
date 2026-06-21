@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Text, View, ActivityIndicator } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { HighContrastProvider } from '../utils/HighContrastContext';
+import { COLORS, RADIUS, FONT } from '../utils/constants';
 import LandingScreen from '../screens/LandingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -14,20 +16,28 @@ import ReportScreen from '../screens/ReportScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const TEAL = '#0F6E56';
-const GRAY = '#888780';
+const TABS = [
+  { name: 'Nyumbani',   label: 'Home',        icon: 'view-dashboard-outline',    iconActive: 'view-dashboard',       Component: HomeScreen },
+  { name: 'Dawa',       label: 'Meds',        icon: 'pill',                      iconActive: 'pill',                 Component: PrescriptionScreen },
+  { name: 'Vikumbusho', label: 'Reminders',   icon: 'bell-ring-outline',         iconActive: 'bell-ring',            Component: RemindersScreen },
+  { name: 'Ripoti',     label: 'Reports',     icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: ReportScreen },
+];
 
-function TabIcon({ label, focused }) {
-  const icons = {
-    Nyumbani: '🏠',
-    Dawa: '💊',
-    Vikumbusho: '⏰',
-    Ripoti: '📊',
-  };
+function TabIcon({ icon, iconActive, focused, label }) {
   return (
-    <View style={{ alignItems: 'center', gap: 2 }}>
-      <Text style={{ fontSize: 20 }}>{icons[label]}</Text>
-      <Text style={{ fontSize: 10, color: focused ? TEAL : GRAY, fontWeight: focused ? '600' : '400' }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+      <MaterialCommunityIcons
+        name={focused ? iconActive : icon}
+        size={26}
+        color={focused ? COLORS.primary : COLORS.outline}
+      />
+      <Text style={{
+        fontSize: 10,
+        fontFamily: FONT.body,
+        fontWeight: '500',
+        color: focused ? COLORS.primary : COLORS.outline,
+        letterSpacing: 0.3,
+      }}>
         {label}
       </Text>
     </View>
@@ -40,35 +50,34 @@ function MainTabs() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: '#e0e0e0',
-          borderTopWidth: 0.5,
-          height: 65,
-          paddingBottom: 8,
+          backgroundColor: 'rgba(255,255,255,0.85)',
+          borderTopWidth: 0,
+          height: 72,
+          paddingTop: 8,
+          paddingBottom: 10,
+          paddingHorizontal: 8,
+          backdropFilter: 'blur(20px)',
+          elevation: 0,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 12,
         },
         tabBarShowLabel: false,
       }}
     >
-      <Tab.Screen
-        name="Nyumbani"
-        component={HomeScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon label="Nyumbani" focused={focused} /> }}
-      />
-      <Tab.Screen
-        name="Dawa"
-        component={PrescriptionScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon label="Dawa" focused={focused} /> }}
-      />
-      <Tab.Screen
-        name="Vikumbusho"
-        component={RemindersScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon label="Vikumbusho" focused={focused} /> }}
-      />
-      <Tab.Screen
-        name="Ripoti"
-        component={ReportScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon label="Ripoti" focused={focused} /> }}
-      />
+      {TABS.map(({ name, label, icon, iconActive, Component }) => (
+        <Tab.Screen
+          key={name}
+          name={name}
+          component={Component}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon icon={icon} iconActive={iconActive} focused={focused} label={label} />
+            ),
+          }}
+        />
+      ))}
     </Tab.Navigator>
   );
 }
@@ -83,9 +92,11 @@ export default function AppNavigator() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F6E56' }}>
-        <Text style={{ fontSize: 28, fontWeight: '900', color: '#fff', marginBottom: 16 }}>MEDISAUTI</Text>
-        <ActivityIndicator size="large" color="#fff" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
+        <Text style={{ fontSize: 28, fontFamily: FONT.headline, color: COLORS.primary, marginBottom: 16 }}>
+          MEDISAUTI
+        </Text>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }

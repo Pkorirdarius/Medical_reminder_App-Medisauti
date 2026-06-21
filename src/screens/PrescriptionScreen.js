@@ -1,500 +1,299 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
-  RefreshControl,
+  TextInput, Alert, ActivityIndicator, RefreshControl,
+  Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
-import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SHADOW } from '../utils/constants';
+import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, savePrescription, deletePrescription } from '../utils/storage';
-import { scheduleReminder, cancelReminder } from '../utils/reminders';
-import { OCR_WEBVIEW_HTML, parseOCRText } from '../utils/ocr';
+import { useHighContrast } from '../utils/HighContrastContext';
+import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
 
 const INITIAL_FORM = {
-  drugName:  '',
-  dosage:    '',
-  frequency: '',
-  times:     ['08:00'],
-  notes:     '',
-  source:    'manual',
+  drugName: '', dosage: '', frequency: '', times: ['08:00'], notes: '', source: 'manual',
 };
 
-function FormInput({ label, value, onChangeText, placeholder, keyboardType = 'default' }) {
+function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
   return (
-    <View style={styles.formRow}>
-      <Text style={styles.formLabel}>{label}</Text>
+    <View style={{ gap: 4 }}>
+      <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
-        style={styles.formInput}
+        style={[styles.input, multiline && { minHeight: 72, paddingTop: 10 }]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={COLORS.text.hint}
+        placeholderTextColor={COLORS.outline}
         keyboardType={keyboardType}
+        multiline={multiline}
       />
     </View>
   );
 }
 
+function PrescriptionCard({ item, onDelete, language }) {
+  return (
+    <View style={styles.medCard}>
+      <View style={styles.medCardHeader}>
+        <View style={styles.medCardLeft}>
+          <View style={styles.medIconWrap}>
+            <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
+            <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
+          </View>
+          {item.source === 'doctor' && (
+            <View style={styles.docBadge}>
+              <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
+              <Text style={styles.docBadgeText}>Daktari</Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
+          <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+        </TouchableOpacity>
+      </View>
+      {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
+    </View>
+  );
+}
+
 export default function PrescriptionScreen() {
-  const insets      = useSafeAreaInsets();
-  const webviewRef  = useRef(null);
-  const scrollRef   = useRef(null);
+  const insets = useSafeAreaInsets();
+  const { toggleHighContrast } = useHighContrast();
+  const scrollRef = useRef(null);
 
   const [prescriptions, setPrescriptions] = useState([]);
-  const [form, setForm]                   = useState(INITIAL_FORM);
-  const [scanning, setScanning]           = useState(false);
-  const [ocrProgress, setOcrProgress]     = useState(0);
-  const [language, setLanguage]           = useState('sw');
-  const [showForm, setShowForm]           = useState(false);
-  const [refreshing, setRefreshing]       = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [language, setLanguage] = useState('sw');
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [saving, setSaving] = useState(false);
 
-  useFocusEffect(
-    useCallback(() => { loadPrescriptions(); }, [])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => {
+    if (scrollRef.current) setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
+  }, []));
 
-  useFocusEffect(
-    useCallback(() => {
-      if (scrollRef.current) {
-        setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
-      }
-    }, [])
-  );
-
-  async function loadPrescriptions() {
-    const data = await getPrescriptions();
-    setPrescriptions(data);
-    setRefreshing(false);
-  }
-
-  function onRefresh() {
-    setRefreshing(true);
-    loadPrescriptions();
-  }
-
-  async function handlePhotoScan() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        language === 'sw' ? 'Ruhusa Inahitajika' : 'Permission Required',
-        language === 'sw'
-          ? 'Tafadhali ruhusu kamera kuchukua picha za dawa.'
-          : 'Please allow camera access to scan prescriptions.'
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      const asset = result.assets[0];
-      setScanning(true);
-      setOcrProgress(0);
-
-      if (webviewRef.current) {
-        webviewRef.current.postMessage(
-          JSON.stringify({ imageUri: `data:image/jpeg;base64,${asset.base64}` })
-        );
-      }
-    }
-  }
-
-  async function handleGalleryPick() {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets?.[0]) {
-      setScanning(true);
-      setOcrProgress(0);
-      if (webviewRef.current) {
-        webviewRef.current.postMessage(
-          JSON.stringify({ imageUri: `data:image/jpeg;base64,${result.assets[0].base64}` })
-        );
-      }
-    }
-  }
-
-  function handleWebViewMessage(event) {
+  async function loadData() {
     try {
-      const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.type === 'progress') {
-        setOcrProgress(msg.progress);
-      } else if (msg.type === 'result') {
-        setScanning(false);
-        const parsed = parseOCRText(msg.text);
-        setForm({
-          drugName:  parsed.drugName  || '',
-          dosage:    parsed.dosage    || '',
-          frequency: parsed.frequency || '',
-          times:     parsed.times     || ['08:00'],
-          notes:     '',
-          source:    'manual',
-        });
-        setShowForm(true);
-        scrollRef.current?.scrollTo?.({ y: 0, animated: true });
-        Alert.alert(
-          language === 'sw' ? '✅ Imetambuliwa' : '✅ Detected',
-          language === 'sw'
-            ? 'Maandishi ya dawa yametambuliwa. Tafadhali kagua na urekebishe.'
-            : 'Prescription text detected. Please review and correct if needed.'
-        );
-      } else if (msg.type === 'error') {
-        setScanning(false);
-        Alert.alert('OCR Error', msg.message);
-      }
-    } catch (e) {
-      setScanning(false);
-    }
+      const meds = await getPrescriptions();
+      setPrescriptions(meds);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); setRefreshing(false); }
   }
+
+  function onRefresh() { setRefreshing(true); loadData(); }
+
+  function resetForm() { setForm(INITIAL_FORM); setShowForm(false); }
 
   async function handleSave() {
-    if (!form.drugName.trim()) {
-      Alert.alert(
-        language === 'sw' ? 'Kosa' : 'Error',
-        language === 'sw' ? 'Tafadhali ingiza jina la dawa.' : 'Please enter the drug name.'
-      );
+    if (!form.drugName.trim() || !form.dosage.trim()) {
+      Alert.alert(language === 'sw' ? 'Hitilafu' : 'Error', language === 'sw' ? 'Tafadhali jaza jina na kipimo cha dawa.' : 'Please fill drug name and dosage.');
       return;
     }
-
-    const prescription = {
-      id:        Date.now().toString(),
-      ...form,
-      createdAt: new Date().toISOString(),
-      active:    true,
-      notifIds:  [],
-    };
-
-    const notifIds = [];
-    for (const time of prescription.times) {
-      try {
-        const nid = await scheduleReminder(prescription, time, language);
-        notifIds.push({ time, nid });
-      } catch (e) {
-        console.warn('Could not schedule notification for', time, e);
+    setSaving(true);
+    try {
+      const prescription = {
+        id: Date.now().toString(),
+        ...form,
+        times: form.times.map(t => normalizeTime(t.trim())),
+        createdAt: new Date().toISOString(),
+        active: true,
+        notifIds: [],
+      };
+      const notifIds = [];
+      for (const time of prescription.times) {
+        try {
+          const nid = await scheduleReminder(prescription, time, language);
+          notifIds.push({ time, nid });
+        } catch (e) {
+          console.warn('Could not schedule notification for', time, e);
+        }
       }
-    }
-    prescription.notifIds = notifIds;
+      prescription.notifIds = notifIds;
+      await savePrescription(prescription);
+      await loadData();
+      resetForm();
+      Alert.alert(
+        language === 'sw' ? '✅ Imehifadhiwa' : '✅ Saved',
+        language === 'sw' ? `Dawa ya ${prescription.drugName} imehifadhiwa na vikumbusho vimewekwa.` : `${prescription.drugName} saved and reminders scheduled.`
+      );
+    } catch (e) { Alert.alert('Error', e.message); }
+    finally { setSaving(false); }
+  }
 
-    await savePrescription(prescription);
-    await loadPrescriptions();
-
-    setForm(INITIAL_FORM);
-    setShowForm(false);
+  async function handleDelete(item) {
     Alert.alert(
-      language === 'sw' ? '✅ Imehifadhiwa' : '✅ Saved',
-      language === 'sw'
-        ? `Dawa ya ${prescription.drugName} imehifadhiwa na vikumbusho vimewekwa.`
-        : `${prescription.drugName} saved and reminders scheduled.`
+      language === 'sw' ? 'Futa dawa?' : 'Delete medication?',
+      language === 'sw' ? 'Una uhakika unataka kufuta dawa hii?' : 'Are you sure you want to delete this medication?',
+      [
+        { text: language === 'sw' ? 'Hapana' : 'Cancel', style: 'cancel' },
+        {
+          text: language === 'sw' ? 'Futa' : 'Delete', style: 'destructive',
+          onPress: async () => {
+            for (const n of item.notifIds || []) { try { await cancelReminder(n.nid); } catch (e) {} }
+            await deletePrescription(item.id);
+            await loadData();
+          },
+        },
+      ]
     );
   }
 
-  async function handleDelete(id, notifIds = []) {
-    for (const { nid } of notifIds) {
-      try { await cancelReminder(nid); } catch {}
-    }
-    await deletePrescription(id);
-    await loadPrescriptions();
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {language === 'sw' ? '💊 Dawa · Prescriptions' : '💊 Prescriptions'}
-          </Text>
-          <Text style={styles.headerSub}>
-            {language === 'sw' ? 'Skani au ingiza kwa mkono' : 'Scan or enter manually'}
-          </Text>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <MaterialCommunityIcons name="pill" size={28} color={COLORS.primary} />
+          <Text style={styles.headerTitle}>Dawa</Text>
         </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+            <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
+            <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-        <View style={styles.langRow}>
-          {['sw', 'en'].map(l => (
-            <TouchableOpacity
-              key={l}
-              style={[styles.langBtn, language === l && styles.langBtnActive]}
-              onPress={() => setLanguage(l)}
-            >
-              <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
-                {l === 'sw' ? 'Kiswahili' : 'English'}
-              </Text>
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+      >
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 60 }} color={COLORS.primary} />
+        ) : (
+          <>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
+              <Text style={styles.addBtnText}>{language === 'sw' ? 'Ongeza dawa' : 'Add medication'}</Text>
             </TouchableOpacity>
-          ))}
-        </View>
 
-        <WebView
-          ref={webviewRef}
-          style={{ width: 0, height: 0 }}
-          source={{ html: OCR_WEBVIEW_HTML }}
-          onMessage={handleWebViewMessage}
-          javaScriptEnabled
-          domStorageEnabled
-        />
+            {prescriptions.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="pill-off" size={56} color={COLORS.outline} />
+                <Text style={styles.emptyTitle}>{language === 'sw' ? 'Hakuna dawa' : 'No medications'}</Text>
+                <Text style={styles.emptySub}>{language === 'sw' ? 'Bonyeza kituo cha juu kuongeza dawa yako ya kwanza.' : 'Tap the button above to add your first medication.'}</Text>
+              </View>
+            ) : (
+              prescriptions.map((item, i) => (
+                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} language={language} />
+              ))
+            )}
+          </>
+        )}
+      </ScrollView>
 
-        <ScrollView
-          ref={scrollRef}
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={true}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[COLORS.teal[600]]}
-              tintColor={COLORS.teal[600]}
-            />
-          }
+      {/* ── Add/Edit Form Modal ── */}
+      <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={[styles.modalScreen, { paddingTop: insets.top }]}
         >
-          <View style={styles.scanRow}>
-            <TouchableOpacity
-              style={[styles.scanBtn, styles.scanBtnPrimary]}
-              onPress={handlePhotoScan}
-              disabled={scanning}
-            >
-              {scanning ? (
-                <View style={{ alignItems: 'center' }}>
-                  <ActivityIndicator color="#fff" />
-                  <Text style={styles.scanBtnTextPrimary}>{ocrProgress}%</Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={{ fontSize: 28 }}>📷</Text>
-                  <Text style={styles.scanBtnTextPrimary}>
-                    {language === 'sw' ? 'Piga Picha' : 'Take Photo'}
-                  </Text>
-                  <Text style={styles.scanBtnSub}>OCR auto-fill</Text>
-                </>
-              )}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={resetForm}>
+              <Text style={styles.modalCancel}>{language === 'sw' ? 'Ghairi' : 'Cancel'}</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.scanBtn, styles.scanBtnOutline]}
-              onPress={handleGalleryPick}
-              disabled={scanning}
-            >
-              <Text style={{ fontSize: 28 }}>🖼️</Text>
-              <Text style={styles.scanBtnTextOutline}>
-                {language === 'sw' ? 'Chagua Picha' : 'Gallery'}
-              </Text>
-              <Text style={[styles.scanBtnSub, { color: COLORS.teal[400] }]}>from gallery</Text>
+            <Text style={styles.modalTitle}>{language === 'sw' ? 'Dawa mpya' : 'New medication'}</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.modalSave}>{language === 'sw' ? 'Hifadhi' : 'Save'}</Text>}
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity onPress={() => setShowForm(!showForm)} style={styles.manualToggle}>
-            <Text style={styles.manualToggleText}>
-              {showForm
-                ? (language === 'sw' ? '▲ Ficha fomu' : '▲ Hide form')
-                : (language === 'sw' ? '+ Ingiza kwa mkono' : '+ Enter manually')}
-            </Text>
-          </TouchableOpacity>
-
-          {showForm && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {language === 'sw' ? 'Maelezo ya Dawa' : 'Prescription Details'}
-              </Text>
-
-              <FormInput
-                label={language === 'sw' ? 'Jina la dawa' : 'Drug name'}
-                value={form.drugName}
-                onChangeText={v => setForm(f => ({ ...f, drugName: v }))}
-                placeholder="e.g. Metformin"
-              />
-              <FormInput
-                label={language === 'sw' ? 'Kipimo (Dosage)' : 'Dosage'}
-                value={form.dosage}
-                onChangeText={v => setForm(f => ({ ...f, dosage: v }))}
-                placeholder="e.g. 500mg"
-              />
-              <FormInput
-                label={language === 'sw' ? 'Mzunguko (Frequency)' : 'Frequency'}
-                value={form.frequency}
-                onChangeText={v => setForm(f => ({ ...f, frequency: v }))}
-                placeholder="e.g. Twice daily"
-              />
-              <FormInput
-                label={language === 'sw' ? 'Nyakati (Times) — separate with comma' : 'Times'}
-                value={form.times.join(', ')}
-                onChangeText={v => setForm(f => ({ ...f, times: v.split(',').map(t => t.trim()) }))}
-                placeholder="08:00, 20:00"
-              />
-              <FormInput
-                label={language === 'sw' ? 'Maelezo zaidi (optional)' : 'Notes (optional)'}
-                value={form.notes}
-                onChangeText={v => setForm(f => ({ ...f, notes: v }))}
-                placeholder={language === 'sw' ? 'e.g. Na chakula' : 'e.g. With food'}
-              />
-
-              <View style={styles.sourceRow}>
-                <Text style={styles.formLabel}>
-                  {language === 'sw' ? 'Chanzo cha dawa' : 'Prescription source'}
-                </Text>
-                <View style={styles.sourceToggleRow}>
-                  <TouchableOpacity
-                    style={[styles.sourceBtn, form.source === 'manual' && styles.sourceBtnActive]}
-                    onPress={() => setForm(f => ({ ...f, source: 'manual' }))}
-                  >
-                    <Text style={[styles.sourceBtnText, form.source === 'manual' && styles.sourceBtnTextActive]}>
-                      {language === 'sw' ? '✍️ Mkono' : '✍️ Manual'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.sourceBtn, form.source === 'doctor' && styles.sourceBtnActive]}
-                    onPress={() => setForm(f => ({ ...f, source: 'doctor' }))}
-                  >
-                    <Text style={[styles.sourceBtnText, form.source === 'doctor' && styles.sourceBtnTextActive]}>
-                      {language === 'sw' ? '🩺 Daktari' : '🩺 Doctor'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                {form.source === 'doctor' && (
-                  <Text style={styles.sourceHint}>
-                    {language === 'sw'
-                      ? 'Dawa imeingizwa kutoka kwa daktari. Hii itawekwa alama kwenye ripoti.'
-                      : 'Prescription recorded from doctor. This will be marked in the report.'}
-                  </Text>
-                )}
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <FormInput label={language === 'sw' ? 'Jina la dawa' : 'Drug name'} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder="e.g. Amoxicillin" />
+            <FormInput label={language === 'sw' ? 'Kipimo' : 'Dosage'} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder="e.g. 500mg" />
+            <FormInput label={language === 'sw' ? 'Mara' : 'Frequency'} value={form.frequency} onChangeText={v => setForm(f => ({ ...f, frequency: v }))} placeholder="e.g. Twice daily" />
+            <FormInput label={language === 'sw' ? 'Nyakati — separate with comma' : 'Times'} value={form.times.join(', ')} onChangeText={v => setForm(f => ({ ...f, times: v.split(',').map(t => normalizeTime(t.trim())) }))} placeholder="08:00, 20:00" />
+            <FormInput label={language === 'sw' ? 'Maelezo (optional)' : 'Notes (optional)'} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={language === 'sw' ? 'e.g. Na chakula' : 'e.g. With food'} multiline />
+            <View style={styles.sourceRow}>
+              <Text style={styles.inputLabel}>{language === 'sw' ? 'Chanzo' : 'Source'}</Text>
+              <View style={styles.sourceToggle}>
+                <TouchableOpacity style={[styles.sourceOpt, form.source === 'manual' && styles.sourceOptActive]} onPress={() => setForm(f => ({ ...f, source: 'manual' }))}>
+                  <MaterialCommunityIcons name="pencil-outline" size={16} color={form.source === 'manual' ? '#fff' : COLORS.onSurfaceVariant} />
+                  <Text style={[styles.sourceOptText, form.source === 'manual' && styles.sourceOptTextActive]}>Manual</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.sourceOpt, form.source === 'doctor' && styles.sourceOptActive]} onPress={() => setForm(f => ({ ...f, source: 'doctor' }))}>
+                  <MaterialCommunityIcons name="stethoscope" size={16} color={form.source === 'doctor' ? '#fff' : COLORS.onSurfaceVariant} />
+                  <Text style={[styles.sourceOptText, form.source === 'doctor' && styles.sourceOptTextActive]}>Daktari</Text>
+                </TouchableOpacity>
               </View>
-
-              <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                <Text style={styles.saveBtnText}>
-                  {language === 'sw' ? '💾 Hifadhi Dawa' : '💾 Save Prescription'}
-                </Text>
-              </TouchableOpacity>
             </View>
-          )}
-
-          {prescriptions.length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {language === 'sw' ? 'Dawa Zilizohifadhiwa' : 'Saved Prescriptions'}
-              </Text>
-              {prescriptions.map((p, i) => (
-                <View key={p.id || i} style={styles.savedRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.medName}>{p.drugName} {p.dosage}</Text>
-                      {p.source === 'doctor' && (
-                        <Text style={styles.sourceBadge}>
-                          {language === 'sw' ? '🩺 Daktari' : '🩺 Doctor'}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.medSub}>{p.frequency} · {(p.times || []).join(', ')}</Text>
-                    {p.notes ? <Text style={styles.medSub}>{p.notes}</Text> : null}
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => Alert.alert(
-                      language === 'sw' ? 'Futa Dawa?' : 'Delete?',
-                      language === 'sw'
-                        ? `Je, unataka kufuta ${p.drugName}?`
-                        : `Delete ${p.drugName}?`,
-                      [
-                        { text: language === 'sw' ? 'Hapana' : 'Cancel', style: 'cancel' },
-                        { text: language === 'sw' ? 'Futa' : 'Delete', style: 'destructive',
-                          onPress: () => handleDelete(p.id, p.notifIds) },
-                      ]
-                    )}
-                  >
-                    <Text style={{ fontSize: 18 }}>🗑️</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container:          { flex: 1, backgroundColor: COLORS.background },
-  header:             { backgroundColor: COLORS.teal[600], padding: 16, paddingBottom: 18 },
-  headerTitle:        { fontSize: 18, fontWeight: '600', color: '#fff' },
-  headerSub:          { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-
-  langRow:            {
-    flexDirection: 'row', backgroundColor: '#fff',
-    borderBottomWidth: 0.5, borderColor: '#e0e0e0',
+  screen:         { flex: 1, backgroundColor: COLORS.background },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: COLORS.background,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+    zIndex: 10,
   },
-  langBtn:            { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  langBtnActive:      { borderBottomWidth: 2, borderBottomColor: COLORS.teal[400] },
-  langBtnText:        { fontSize: 13, color: COLORS.text.secondary },
-  langBtnTextActive:  { color: COLORS.teal[600], fontWeight: '600' },
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5 },
+  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
 
-  scroll:             { flex: 1 },
-  scrollContent:      { padding: 12, paddingBottom: 40, flexGrow: 1 },
+  scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
 
-  scanRow:            { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  scanBtn:            {
-    flex: 1, borderRadius: RADIUS.lg, padding: 20,
-    alignItems: 'center', gap: 4,
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, paddingVertical: 14,
+    marginBottom: 16,
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  scanBtnPrimary:     { backgroundColor: COLORS.teal[600] },
-  scanBtnOutline:     {
-    backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.teal[100],
-  },
-  scanBtnTextPrimary: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  scanBtnTextOutline: { color: COLORS.teal[600], fontSize: 14, fontWeight: '600' },
-  scanBtnSub:         { fontSize: 11, color: 'rgba(255,255,255,0.75)' },
+  addBtnText:     { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
 
-  manualToggle:       { alignSelf: 'center', marginBottom: 10 },
-  manualToggleText:   { fontSize: 13, color: COLORS.teal[600], fontWeight: '500' },
+  medCard: {
+    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  medCardHeader:  { flexDirection: 'row', alignItems: 'flex-start' },
+  medCardLeft:    { flex: 1, flexDirection: 'row', gap: 12 },
+  medIconWrap:    { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.onPrimaryContainer + '25', alignItems: 'center', justifyContent: 'center' },
+  medCardName:    { fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
+  medCardSub:     { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 1 },
+  docBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.blue[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+  docBadgeText:   { fontSize: 10, fontFamily: FONT.bodySemiBold, color: COLORS.blue[800] },
+  deleteBtn:      { padding: 4 },
+  medCardNotes:   { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 8, backgroundColor: COLORS.surfaceLow, padding: 10, borderRadius: RADIUS.md },
 
-  card:               {
-    backgroundColor: '#fff', borderRadius: RADIUS.lg,
-    padding: 14, marginBottom: 12, ...SHADOW.sm,
-  },
-  cardTitle:          {
-    fontSize: 11, fontWeight: '600', color: COLORS.text.secondary,
-    textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 12,
-  },
+  emptyState:     { alignItems: 'center', paddingVertical: 60 },
+  emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginTop: 16 },
+  emptySub:       { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
 
-  formRow:            { marginBottom: 10 },
-  formLabel:          { fontSize: 12, color: COLORS.text.secondary, marginBottom: 4 },
-  formInput:          {
-    borderWidth: 0.5, borderColor: '#ccc', borderRadius: RADIUS.md,
-    padding: 10, fontSize: 14, color: COLORS.text.primary, backgroundColor: '#fff',
-  },
+  /* Modal */
+  modalScreen:    { flex: 1, backgroundColor: COLORS.background },
+  modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: COLORS.surfaceLowest, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh },
+  modalTitle:     { fontSize: 16, fontFamily: FONT.bold, color: COLORS.onSurface },
+  modalCancel:    { fontSize: 14, fontFamily: FONT.body, color: COLORS.outline },
+  modalSave:      { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.primary },
+  modalContent:   { padding: 16, gap: 16, paddingBottom: 60 },
 
-  sourceRow:          { marginBottom: 12 },
-  sourceToggleRow:    { flexDirection: 'row', gap: 8, marginTop: 4 },
-  sourceBtn:          {
-    flex: 1, paddingVertical: 10, alignItems: 'center',
-    borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#ccc',
-    backgroundColor: '#fff',
-  },
-  sourceBtnActive:    { borderColor: COLORS.teal[400], backgroundColor: COLORS.teal[50] },
-  sourceBtnText:      { fontSize: 13, color: COLORS.text.secondary },
-  sourceBtnTextActive:{ color: COLORS.teal[600], fontWeight: '600' },
-  sourceHint:         { fontSize: 11, color: COLORS.text.secondary, marginTop: 4, fontStyle: 'italic' },
+  inputLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.3 },
+  input:          { backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: FONT.body, color: COLORS.onSurface, borderWidth: 1, borderColor: COLORS.surfaceHigh },
 
-  saveBtn:            {
-    backgroundColor: COLORS.teal[600], borderRadius: RADIUS.md,
-    padding: 12, alignItems: 'center', marginTop: 4,
-  },
-  saveBtnText:        { color: '#fff', fontSize: 15, fontWeight: '600' },
-
-  savedRow:           {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 8, borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8',
-  },
-  medName:            { fontSize: 14, fontWeight: '500', color: COLORS.text.primary },
-  medSub:             { fontSize: 12, color: COLORS.text.secondary, marginTop: 1 },
-  sourceBadge:        { fontSize: 11, fontWeight: '600', color: COLORS.teal[600], backgroundColor: COLORS.teal[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2, overflow: 'hidden' },
+  sourceRow:      { gap: 8 },
+  sourceToggle:   { flexDirection: 'row', gap: 8 },
+  sourceOpt:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh },
+  sourceOptActive:{ backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  sourceOptText:  { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant },
+  sourceOptTextActive: { color: '#fff' },
 });

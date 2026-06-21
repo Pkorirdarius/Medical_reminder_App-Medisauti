@@ -3,7 +3,8 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, RADIUS, SHADOW } from '../utils/constants';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { COLORS, RADIUS, FONT } from '../utils/constants';
 
 export default function LandingScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -11,11 +12,10 @@ export default function LandingScreen({ navigation }) {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
+      style={styles.screen}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 40 }]}
       bounces={false}
     >
-      {/* Language toggle */}
       <View style={styles.langRow}>
         {['sw', 'en'].map(l => (
           <TouchableOpacity
@@ -30,10 +30,11 @@ export default function LandingScreen({ navigation }) {
         ))}
       </View>
 
-      {/* Hero section */}
       <View style={styles.hero}>
-        <Text style={styles.heroIcon}>💊</Text>
-        <Text style={styles.appName}>MEDISAUTI</Text>
+        <View style={styles.heroIconWrap}>
+          <MaterialCommunityIcons name="heart-pulse" size={48} color="#fff" />
+        </View>
+        <Text style={styles.appName}>MediSauti</Text>
         <Text style={styles.tagline}>
           {language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}
         </Text>
@@ -44,14 +45,13 @@ export default function LandingScreen({ navigation }) {
         </Text>
       </View>
 
-      {/* Action buttons */}
       <View style={styles.actionsCard}>
         <TouchableOpacity
           style={styles.loginBtn}
           onPress={() => navigation.navigate('Auth', { initialMode: 'login' })}
           activeOpacity={0.8}
         >
-          <Text style={styles.loginBtnIcon}>🔐</Text>
+          <MaterialCommunityIcons name="shield-lock-outline" size={24} color="#fff" />
           <View style={styles.btnTextWrap}>
             <Text style={styles.loginBtnLabel}>
               {language === 'sw' ? 'Ingia' : 'Login'}
@@ -64,9 +64,7 @@ export default function LandingScreen({ navigation }) {
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>
-            {language === 'sw' ? 'AU' : 'OR'}
-          </Text>
+          <Text style={styles.dividerText}>{language === 'sw' ? 'AU' : 'OR'}</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -75,7 +73,7 @@ export default function LandingScreen({ navigation }) {
           onPress={() => navigation.navigate('Auth', { initialMode: 'register' })}
           activeOpacity={0.8}
         >
-          <Text style={styles.registerBtnIcon}>📝</Text>
+          <MaterialCommunityIcons name="account-plus-outline" size={24} color={COLORS.primary} />
           <View style={styles.btnTextWrap}>
             <Text style={styles.registerBtnLabel}>
               {language === 'sw' ? 'Jisajili' : 'Register'}
@@ -91,46 +89,45 @@ export default function LandingScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: COLORS.teal[600] },
+  screen:         { flex: 1, backgroundColor: COLORS.primary },
   content:        { flexGrow: 1, padding: 20, paddingBottom: 40 },
 
-  langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginBottom: 30, borderRadius: RADIUS.md, overflow: 'hidden' },
-  langBtn:        { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  langBtnActive:  { backgroundColor: COLORS.teal[50] },
-  langBtnText:    { fontSize: 13, color: COLORS.text.secondary, fontWeight: '500' },
-  langBtnTextActive: { color: COLORS.teal[600], fontWeight: '700' },
+  langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginBottom: 30, borderRadius: RADIUS.xl, overflow: 'hidden', alignSelf: 'center' },
+  langBtn:        { paddingHorizontal: 28, paddingVertical: 10, alignItems: 'center' },
+  langBtnActive:  { backgroundColor: COLORS.primaryFixed + '40' },
+  langBtnText:    { fontSize: 13, fontFamily: FONT.bodyMedium },
+  langBtnTextActive: { color: COLORS.primary, fontWeight: '700' },
 
   hero:           { alignItems: 'center', marginBottom: 40 },
-  heroIcon:       { fontSize: 64, marginBottom: 12 },
-  appName:        { fontSize: 36, fontWeight: '900', color: '#fff', letterSpacing: 1.5 },
-  tagline:        { fontSize: 15, color: 'rgba(255,255,255,0.85)', marginTop: 6 },
-  description:    { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 10, textAlign: 'center', lineHeight: 18, paddingHorizontal: 10 },
+  heroIconWrap:   { width: 80, height: 80, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  appName:        { fontSize: 36, fontFamily: FONT.headline, color: '#fff', letterSpacing: -1 },
+  tagline:        { fontSize: 15, fontFamily: FONT.body, color: 'rgba(255,255,255,0.85)', marginTop: 6 },
+  description:    { fontSize: 13, fontFamily: FONT.body, color: 'rgba(255,255,255,0.7)', marginTop: 10, textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 },
 
-  actionsCard:    {
-    backgroundColor: '#fff', borderRadius: RADIUS.xl,
-    padding: 24, ...SHADOW.sm,
+  actionsCard: {
+    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xxl,
+    padding: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8,
   },
 
-  loginBtn:       {
-    backgroundColor: COLORS.teal[600], borderRadius: RADIUS.md,
+  loginBtn: {
+    backgroundColor: COLORS.primary, borderRadius: RADIUS.xl,
     padding: 16, flexDirection: 'row', alignItems: 'center',
+    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
   },
-  loginBtnIcon:   { fontSize: 24, marginRight: 12 },
-  loginBtnLabel:  { color: '#fff', fontSize: 16, fontWeight: '700' },
-  loginBtnSub:    { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
+  loginBtnLabel:  { color: '#fff', fontSize: 16, fontFamily: FONT.bold },
+  loginBtnSub:    { color: 'rgba(255,255,255,0.75)', fontSize: 12, fontFamily: FONT.body, marginTop: 2 },
 
   divider:        { flexDirection: 'row', alignItems: 'center', marginVertical: 20 },
-  dividerLine:    { flex: 1, height: 0.5, backgroundColor: '#ccc' },
-  dividerText:    { fontSize: 12, color: COLORS.text.secondary, marginHorizontal: 10, fontWeight: '500' },
+  dividerLine:    { flex: 1, height: 0.5, backgroundColor: COLORS.surfaceHigh },
+  dividerText:    { fontSize: 12, fontFamily: FONT.bodyMedium },
 
-  registerBtn:    {
-    borderWidth: 1.5, borderColor: COLORS.teal[600], borderRadius: RADIUS.md,
-    padding: 16, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff',
+  registerBtn: {
+    borderWidth: 1.5, borderColor: COLORS.primary, borderRadius: RADIUS.xl,
+    padding: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceLowest,
   },
-  registerBtnIcon: { fontSize: 24, marginRight: 12 },
-  registerBtnLabel: { color: COLORS.teal[600], fontSize: 16, fontWeight: '700' },
-  registerBtnSub: { color: COLORS.teal[400], fontSize: 12, marginTop: 2 },
+  registerBtnLabel: { color: COLORS.primary, fontSize: 16, fontFamily: FONT.bold },
+  registerBtnSub: { color: COLORS.primaryContainer, fontSize: 12, fontFamily: FONT.body, marginTop: 2 },
 
-  btnTextWrap:    { flex: 1 },
+  btnTextWrap:    { flex: 1, marginLeft: 12 },
 });

@@ -15,6 +15,19 @@ Notifications.setNotificationHandler({
   }),
 });
 
+/**
+ * Normalize a time string to HH:MM format.
+ * '8' → '08:00', '8:5' → '08:05', '08:00' → '08:00'
+ */
+export function normalizeTime(t) {
+  if (!t || !t.includes(':')) {
+    const h = String(parseInt(t, 10) || 0).padStart(2, '0');
+    return `${h}:00`;
+  }
+  const [h, m] = t.split(':');
+  return `${String(parseInt(h, 10) || 0).padStart(2, '0')}:${String(parseInt(m, 10) || 0).padStart(2, '0')}`;
+}
+
 // ─── Schedule a recurring local notification ─────────────────────────
 /**
  * @param {Object} prescription  - { id, drugName, dosage, times: ['08:00', '18:00'] }
@@ -23,7 +36,8 @@ Notifications.setNotificationHandler({
  * @returns notificationId
  */
 export async function scheduleReminder(prescription, time, language = 'sw') {
-  const [hour, minute] = time.split(':').map(Number);
+  const normalized = normalizeTime(time);
+  const [hour, minute] = normalized.split(':').map(Number);
 
   const body =
     language === 'sw'
