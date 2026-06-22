@@ -12,8 +12,9 @@ import * as Sharing from 'expo-sharing';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, calcAdherence, getDailyStreak, getPerMedicationAdherence, getMissedDosePatterns, getAdherenceTrend, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
+import { useLanguage } from '../utils/LanguageContext';
 
-const PERIOD_MAP = { morning: 'Asubuhi', afternoon: 'Mchana', evening: 'Jioni', night: 'Usiku' };
+const PERIOD_MAP = { morning: 'period_morning', afternoon: 'period_afternoon', evening: 'period_evening', night: 'period_night' };
 
 function ProgressBar({ value, color, height = 6 }) {
   return (
@@ -39,11 +40,11 @@ export default function ReportScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [language, setLanguage] = useState('sw');
   const [exporting, setExporting] = useState(false);
   const [user, setUser] = useState({ name: '' });
   const [prescriptions, setPrescriptions] = useState([]);
@@ -120,9 +121,7 @@ export default function ReportScreen() {
   }
 
   async function shareReport(platform) {
-    const msg = language === 'sw'
-      ? `Ripoti yangu ya afya kutoka MediSauti: Uzingativu ${rate}%`
-      : `My MediSauti health report: ${rate}% adherence`;
+    const msg = `${t('share_message')}: ${rate}%`;
     if (platform === 'whatsapp') {
       Linking.openURL(`https://wa.me/?text=${encodeURIComponent(msg)}`);
     } else if (platform === 'email') {
@@ -139,10 +138,10 @@ export default function ReportScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <MaterialCommunityIcons name="chart-box-outline" size={28} color={COLORS.primary} />
-          <Text style={styles.headerTitle}>Ripoti</Text>
+          <Text style={styles.headerTitle}>{t('header_report')}</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
@@ -168,19 +167,18 @@ export default function ReportScreen() {
           <View style={styles.heroReport}>
             <View style={styles.heroReportTop}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sectionLabel}>Uzingativu wa mwezi</Text>
-                <Text style={styles.sectionLabelSub}>Monthly adherence</Text>
+                <Text style={styles.sectionLabel}>{t('monthly_adherence')}</Text>
               </View>
               <View style={[styles.trendChip, { backgroundColor: rateColor + '20' }]}>
                 <MaterialCommunityIcons name={rate >= 80 ? 'trending-up' : rate >= 50 ? 'minus' : 'trending-down'} size={14} color={rateColor} />
-                <Text style={[styles.trendText, { color: rateColor }]}>{rate >= 80 ? 'Great' : rate >= 50 ? 'Fair' : 'Low'}</Text>
+                <Text style={[styles.trendText, { color: rateColor }]}>{rate >= 80 ? t('trend_great') : rate >= 50 ? t('trend_fair') : t('trend_low')}</Text>
               </View>
             </View>
             <Text style={[styles.heroRate, { color: rateColor }]}>{rate}%</Text>
             <ProgressBar value={rate} color={rateColor} height={10} />
             <View style={styles.heroStats}>
-              <StatRow icon="check-circle" iconColor={COLORS.green[400]} value={adherence.taken} label="Taken" />
-              <StatRow icon="close-circle" iconColor={COLORS.red[400]} value={adherence.missed} label="Missed" />
+              <StatRow icon="check-circle" iconColor={COLORS.green[400]} value={adherence.taken} label={t('status_taken')} />
+              <StatRow icon="close-circle" iconColor={COLORS.red[400]} value={adherence.missed} label={t('status_missed')} />
             </View>
           </View>
 
@@ -188,7 +186,7 @@ export default function ReportScreen() {
           <View style={styles.actionRow}>
             <TouchableOpacity style={styles.exportBtn} onPress={generatePDF} disabled={exporting} activeOpacity={0.7}>
               {exporting ? <ActivityIndicator size="small" color="#fff" /> : <MaterialCommunityIcons name="file-pdf-box" size={20} color="#fff" />}
-              <Text style={styles.exportBtnText}>{exporting ? 'Generating...' : 'Export PDF'}</Text>
+              <Text style={styles.exportBtnText}>{exporting ? t('generating') : t('export_pdf')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.shareWhatsApp} onPress={() => shareReport('whatsapp')} activeOpacity={0.7}>
               <MaterialCommunityIcons name="whatsapp" size={20} color="#fff" />
@@ -205,7 +203,7 @@ export default function ReportScreen() {
           <View style={styles.bentoCard}>
             <View style={styles.cardHeader}>
               <MaterialCommunityIcons name="chart-timeline-variant" size={18} color={COLORS.secondary} />
-              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>Weekly Trend</Text>
+              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_weekly_trend')}</Text>
             </View>
             <View style={styles.trendRow}>
               <MaterialCommunityIcons
@@ -234,7 +232,7 @@ export default function ReportScreen() {
             <View style={styles.bentoCard}>
               <View style={styles.cardHeader}>
                 <MaterialCommunityIcons name="pill" size={18} color={COLORS.primary} />
-                <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>Per Medication</Text>
+                <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_per_med')}</Text>
               </View>
               {perMed.map((p, i) => {
                 const pColor = p.rate >= 80 ? COLORS.green[400] : p.rate >= 50 ? COLORS.amber[400] : COLORS.red[400];
@@ -255,12 +253,12 @@ export default function ReportScreen() {
           <View style={styles.bentoCard}>
             <View style={styles.cardHeader}>
               <MaterialCommunityIcons name="clock-alert-outline" size={18} color={COLORS.amber[400]} />
-              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>Missed Dose Patterns</Text>
+              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_missed_patterns')}</Text>
             </View>
             <View style={styles.patternChart}>
               {Object.entries(patterns).map(([key, val]) => (
                 <View key={key} style={styles.patternRow}>
-                  <Text style={styles.patternLabel}>{PERIOD_MAP[key] || key}</Text>
+                  <Text style={styles.patternLabel}>{t(PERIOD_MAP[key]) || key}</Text>
                   <View style={styles.patternBarBg}>
                     <View style={[styles.patternBarFill, { width: `${(val / maxPattern) * 100}%`, backgroundColor: COLORS.red[400] }]} />
                   </View>
@@ -274,12 +272,12 @@ export default function ReportScreen() {
           <View style={styles.bentoCard}>
             <View style={styles.cardHeader}>
               <MaterialCommunityIcons name="fire" size={18} color={COLORS.amber[400]} />
-              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>7-Day Streak</Text>
+              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_streak_7day')}</Text>
             </View>
             <View style={styles.streakRow}>
               {streak.map((d, i) => {
                 const bg = d.status === 'taken' ? COLORS.green[400] : d.status === 'partial' ? COLORS.amber[400] : COLORS.surfaceHigh;
-                const label = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(d.date).getDay()];
+                const label = [t('sun'), t('mon'), t('tue'), t('wed'), t('thu'), t('fri'), t('sat')][new Date(d.date).getDay()];
                 return (
                   <View key={i} style={styles.streakCol}>
                     <View style={[styles.streakDot, { backgroundColor: bg }]}>
@@ -298,11 +296,11 @@ export default function ReportScreen() {
           <View style={styles.doctorCallout}>
             <View style={styles.doctorBgCircle} />
             <MaterialCommunityIcons name="stethoscope" size={24} color={COLORS.secondary} />
-            <Text style={styles.doctorTitle}>{language === 'sw' ? 'Ungana na daktari' : 'Share with your doctor'}</Text>
-            <Text style={styles.doctorSub}>{language === 'sw' ? 'Pakua ripoti ya PDF na umshirikishe daktari wako kwa ajili ya mapitio bora ya afya yako.' : 'Download the PDF report and share it with your doctor for better health reviews.'}</Text>
+            <Text style={styles.doctorTitle}>{t('heading_share_doctor')}</Text>
+            <Text style={styles.doctorSub}>{t('share_doctor_desc')}</Text>
             <TouchableOpacity style={styles.doctorBtn} onPress={generatePDF} activeOpacity={0.7}>
               <MaterialCommunityIcons name="download" size={18} color="#fff" />
-              <Text style={styles.doctorBtnText}>{language === 'sw' ? 'Pakua ripoti' : 'Download report'}</Text>
+              <Text style={styles.doctorBtnText}>{t('download_report')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -310,7 +308,7 @@ export default function ReportScreen() {
           <View style={styles.bentoCard}>
             <View style={styles.cardHeader}>
               <MaterialCommunityIcons name="history" size={18} color={COLORS.outline} />
-              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>Report History</Text>
+              <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_report_history')}</Text>
             </View>
             {[
               { title: 'June 2024', date: 'Jun 30, 2024', rate: '82%' },
@@ -331,8 +329,8 @@ export default function ReportScreen() {
           <TouchableOpacity style={styles.helpBanner} activeOpacity={0.7}>
             <MaterialCommunityIcons name="lifebuoy" size={24} color="#fff" />
             <View style={{ marginLeft: 12, flex: 1 }}>
-              <Text style={styles.helpTitle}>{language === 'sw' ? 'Unahitaji msaada?' : 'Need help?'}</Text>
-              <Text style={styles.helpSub}>{language === 'sw' ? 'Wasiliana na mtaalamu wa afya sasa.' : 'Contact a health professional now.'}</Text>
+              <Text style={styles.helpTitle}>{t('heading_need_help')}</Text>
+              <Text style={styles.helpSub}>{t('contact_professional')}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>

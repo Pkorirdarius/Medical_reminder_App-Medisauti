@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, getPrescriptions, calcAdherence } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
+import { useLanguage } from '../utils/LanguageContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -44,8 +45,6 @@ function Badge({ label, type }) {
 }
 
 function MedItem({ med }) {
-  const badgeType = med.stock === 'low' ? 'amber' : 'teal';
-  const badgeLabel = med.stock === 'low' ? 'Low stock' : 'Active';
   return (
     <View style={styles.medRow}>
       <View style={[styles.medDot, { backgroundColor: COLORS.onPrimaryContainer + '30' }]}>
@@ -57,7 +56,6 @@ function MedItem({ med }) {
           {med.frequency} · {med.times.map(t => formatTime12(t)).join(', ')}
         </Text>
       </View>
-      <Badge label={badgeLabel} type={badgeType} />
     </View>
   );
 }
@@ -66,6 +64,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { highContrast, toggleHighContrast } = useHighContrast();
+  const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -76,7 +75,6 @@ export default function HomeScreen() {
   const [speaking, setSpeaking]  = useState(false);
   const [loading, setLoading]    = useState(true);
   const [refreshing, setRef]     = useState(false);
-  const [language, setLang]      = useState('sw');
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -132,9 +130,10 @@ export default function HomeScreen() {
 
   const greeting = () => {
     const h = new Date().getHours();
-    if (h < 12) return 'Habari za asubuhi';
-    if (h < 17) return 'Habari za mchana';
-    return 'Habari za jioni';
+    if (h < 12) return t('greeting_morning');
+    if (h < 17) return t('greeting_afternoon');
+    if (h < 21) return t('greeting_evening');
+    return t('greeting_night');
   };
 
   const rate = adherence.rate;
@@ -150,7 +149,7 @@ export default function HomeScreen() {
           <Text style={{ fontSize: 20, fontFamily: FONT.headline, color: COLORS.primary, letterSpacing: -0.5 }}>MediSauti</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => setLang(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
@@ -184,8 +183,7 @@ export default function HomeScreen() {
             <View style={[styles.bentoCard, styles.adhHeroCard]}>
               <View style={styles.adhHeroTop}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.sectionLabel}>Uzingativu wa mwezi</Text>
-                  <Text style={styles.sectionLabelSub}>Monthly adherence</Text>
+                  <Text style={styles.sectionLabel}>{t('heading_adherence')}</Text>
                 </View>
                 <View style={[styles.trendChip, { backgroundColor: rateBg }]}>
                   <MaterialCommunityIcons
@@ -193,7 +191,7 @@ export default function HomeScreen() {
                     size={14} color={rateColor}
                   />
                   <Text style={[styles.trendText, { color: rateColor }]}>
-                    {rate >= 80 ? 'Great' : rate >= 50 ? 'Fair' : 'Low'}
+                    {rate >= 80 ? t('trend_great') : rate >= 50 ? t('trend_fair') : t('trend_low')}
                   </Text>
                 </View>
               </View>
@@ -205,8 +203,8 @@ export default function HomeScreen() {
                   <View style={[styles.progFill, { width: `${rate}%`, backgroundColor: rateColor }]} />
                 </View>
                 <View style={styles.progLabels}>
-                  <Text style={styles.progLabel}>{adherence.taken} taken</Text>
-                  <Text style={styles.progLabel}>{adherence.missed} missed</Text>
+                  <Text style={styles.progLabel}>{adherence.taken} {t('taken_label')}</Text>
+                  <Text style={styles.progLabel}>{adherence.missed} {t('missed_label')}</Text>
                 </View>
               </View>
             </View>
@@ -217,14 +215,14 @@ export default function HomeScreen() {
                 icon="check-circle"
                 iconColor={COLORS.green[400]}
                 value={adherence.taken}
-                label="Doses taken (30d)"
+                label={t('doses_taken_30d')}
                 bg={COLORS.green[50]}
               />
               <StatCard
                 icon="close-circle"
                 iconColor={COLORS.red[400]}
                 value={adherence.missed}
-                label="Missed (30d)"
+                label={t('missed_30d')}
                 bg={COLORS.red[50]}
               />
             </View>
@@ -234,7 +232,7 @@ export default function HomeScreen() {
               <View style={[styles.bentoCard, styles.nextCard]}>
                 <View style={styles.nextHeader}>
                   <MaterialCommunityIcons name="bell-ring" size={16} color={COLORS.primary} />
-                  <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>Inayokuja · Next reminder</Text>
+                  <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>{t('next_reminder')}</Text>
                 </View>
                 <View style={styles.nextBody}>
                   <View style={styles.timeBubble}>
@@ -254,7 +252,7 @@ export default function HomeScreen() {
                 {speaking && (
                   <View style={styles.speakingBar}>
                     <Animated.View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary, opacity: pulseAnim, marginRight: 8 }} />
-                    <Text style={styles.speakingText}>🔊 "Ni wakati wa kuchukua dawa yako..."</Text>
+                    <Text style={styles.speakingText}>{t('speaking_reminder')}</Text>
                   </View>
                 )}
               </View>
@@ -265,10 +263,10 @@ export default function HomeScreen() {
               <View style={[styles.bentoCard, { flex: 1 }]}>
                 <View style={styles.nextHeader}>
                   <MaterialCommunityIcons name="calendar-check" size={16} color={COLORS.secondary} />
-                  <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>Wiki hii · This week</Text>
+                  <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>{t('this_week')}</Text>
                 </View>
                 <View style={styles.weekRow}>
-                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d, i) => {
+                  {[t('mon'),t('tue'),t('wed'),t('thu'),t('fri'),t('sat'),t('sun')].map((d, i) => {
                     const dayOk = i < new Date().getDay();
                     return (
                       <View key={d} style={styles.weekCol}>
@@ -284,8 +282,8 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.bentoCard, styles.doctorCard]}>
                 <MaterialCommunityIcons name="lightbulb-outline" size={20} color={COLORS.secondary} />
-                <Text style={[styles.sectionLabel, { marginTop: 6 }]}>Tip</Text>
-                <Text style={styles.doctorTip}>Take your meds with food to reduce stomach discomfort.</Text>
+                <Text style={[styles.sectionLabel, { marginTop: 6 }]}>{t('tip_heading')}</Text>
+                <Text style={styles.doctorTip}>{t('tip_text')}</Text>
               </View>
             </View>
 
@@ -293,15 +291,12 @@ export default function HomeScreen() {
             <View style={[styles.bentoCard, { marginBottom: 100 }]}>
               <View style={styles.nextHeader}>
                 <MaterialCommunityIcons name="pill" size={16} color={COLORS.primary} />
-                <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>Dawa zote · All medications</Text>
+                <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>{t('all_medications')}</Text>
               </View>
               {prescriptions.length === 0 ? (
                 <View style={styles.emptyState}>
                   <MaterialCommunityIcons name="pill" size={40} color={COLORS.outline} />
-                  <Text style={styles.emptyText}>
-                    Bado hujaongeza dawa. Bonyeza kichupo "Dawa" kuanza.
-                    {'\n'}No meds added yet. Tap the "Dawa" tab to start.
-                  </Text>
+                  <Text style={styles.emptyText}>{t('no_meds_added')}</Text>
                 </View>
               ) : (
                 prescriptions.map((med, i) => <MedItem key={med.id || i} med={med} />)

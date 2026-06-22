@@ -14,6 +14,7 @@ import {
   PublicSans_600SemiBold, PublicSans_700Bold,
 } from '@expo-google-fonts/public-sans';
 import AppNavigator from './src/navigation/AppNavigator';
+import { LanguageProvider } from './src/utils/LanguageContext';
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -48,10 +49,12 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" backgroundColor="#f9faf5" />
-        <AppNavigator />
-      </NavigationContainer>
+      <LanguageProvider>
+        <NavigationContainer>
+          <StatusBar style="dark" backgroundColor="#f9faf5" />
+          <AppNavigator />
+        </NavigationContainer>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }

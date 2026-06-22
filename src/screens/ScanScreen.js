@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, getPrescriptions } from '../utils/storage';
+import { useLanguage } from '../utils/LanguageContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SIDE_PAD = 16;
@@ -23,7 +24,7 @@ export default function ScanScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
-  const [language, setLang] = useState('sw');
+  const { language, toggleLanguage, t } = useLanguage();
 
   useEffect(() => {
     (async () => {
@@ -83,7 +84,7 @@ export default function ScanScreen() {
           <Text style={styles.logoText}>MediSauti</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => setLang(l => l === 'sw' ? 'en' : 'sw')} style={styles.langBtn}>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.langBtn}>
             <Text style={styles.langBtnText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
@@ -100,13 +101,9 @@ export default function ScanScreen() {
         {/* ── Hero ── */}
         <View style={styles.heroSection}>
           <Text style={styles.heroTitle}>
-            Sauti ya <Text style={styles.heroTitleAccent}>Dawa</Text>
+            {t('hero_title')}
           </Text>
-          <Text style={styles.heroSub}>
-            {language === 'sw'
-              ? 'Changanua lebo yako ili upate maelezo ya sauti.'
-              : 'Scan your medication label to get audio instructions.'}
-          </Text>
+          <Text style={styles.heroSub}>{t('hero_subtitle')}</Text>
         </View>
 
         {/* ── Camera Viewfinder ── */}
@@ -131,9 +128,7 @@ export default function ScanScreen() {
             <View style={styles.statusBadge}>
               <MaterialCommunityIcons name={scanning ? 'sync' : 'camera-iris'} size={18} color={COLORS.primary} />
               <Text style={styles.statusText}>
-                {scanning
-                  ? (language === 'sw' ? 'Inasoma...' : 'Scanning...')
-                  : (language === 'sw' ? 'Tayari kuchanganua' : 'Ready to scan')}
+                {scanning ? t('scanning') : t('ready_to_scan')}
               </Text>
             </View>
           </View>
@@ -159,12 +154,8 @@ export default function ScanScreen() {
               <MaterialCommunityIcons name="keyboard" size={24} color={COLORS.onSecondaryContainer} />
             </View>
             <View style={styles.actionTextWrap}>
-              <Text style={styles.actionTitle}>
-                {language === 'sw' ? 'Andika Mwenyewe' : 'Manual Entry'}
-              </Text>
-              <Text style={styles.actionDesc}>
-                {language === 'sw' ? 'Ingiza dawa kwa mkono.' : 'Type medication details manually.'}
-              </Text>
+              <Text style={styles.actionTitle}>{t('manual_entry')}</Text>
+              <Text style={styles.actionDesc}>{t('manual_entry_desc')}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.primary} />
           </TouchableOpacity>
@@ -174,12 +165,8 @@ export default function ScanScreen() {
               <MaterialCommunityIcons name="history" size={24} color={COLORS.onSecondaryContainer} />
             </View>
             <View style={styles.actionTextWrap}>
-              <Text style={styles.actionTitle}>
-                {language === 'sw' ? 'Historia' : 'Recent Scans'}
-              </Text>
-              <Text style={styles.actionDesc}>
-                {language === 'sw' ? 'Dawa zilizochanganuliwa hivi karibuni.' : 'Recently scanned medications.'}
-              </Text>
+              <Text style={styles.actionTitle}>{t('recent_scans')}</Text>
+              <Text style={styles.actionDesc}>{t('recent_scans_desc')}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.primary} />
           </TouchableOpacity>
@@ -189,16 +176,10 @@ export default function ScanScreen() {
         <View style={styles.tipCard}>
           <View style={styles.tipContent}>
             <View style={styles.tipBadge}>
-              <Text style={styles.tipBadgeText}>{language === 'sw' ? 'USHAURI' : 'PRO TIP'}</Text>
+              <Text style={styles.tipBadgeText}>{t('pro_tip_badge')}</Text>
             </View>
-            <Text style={styles.tipTitle}>
-              {language === 'sw' ? 'Hakikisha mwanga mzuri' : 'Ensure good lighting'}
-            </Text>
-            <Text style={styles.tipDesc}>
-              {language === 'sw'
-                ? 'Weka chupa ya dawa mahali penye mwanga mzuri na epuka mionzi kwenye lebo.'
-                : 'Place your medicine bottle in a well-lit area. Avoid glares on the label.'}
-            </Text>
+            <Text style={styles.tipTitle}>{t('pro_tip_title')}</Text>
+            <Text style={styles.tipDesc}>{t('pro_tip_desc')}</Text>
           </View>
           <View style={styles.tipDeco} />
         </View>

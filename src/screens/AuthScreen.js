@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered } from '../utils/storage';
+import { useLanguage } from '../utils/LanguageContext';
 
 const PIN_LENGTH = 4;
 
@@ -27,7 +28,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [confirmPin, setConfirmPin] = useState('');
   const [loginPin, setLoginPin] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [language, setLanguage] = useState('sw');
+  const { language, setLanguage, t } = useLanguage();
   const [registering, setRegistering] = useState(false);
 
   const pulse = useRef(new Animated.Value(1)).current;
@@ -61,15 +62,12 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   async function handleBiometricLogin() {
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: language === 'sw' ? 'Ingiza alama ya uso au kidole' : 'Authenticate to continue',
-        fallbackLabel: language === 'sw' ? 'Tumia PIN' : 'Use PIN',
+        promptMessage: t('auth_biometric_prompt'),
+        fallbackLabel: t('auth_use_pin'),
         disableDeviceFallback: false,
       });
       if (result.success) {
-        Alert.alert(
-          language === 'sw' ? '✅ Imefanikiwa' : '✅ Success',
-          language === 'sw' ? 'Karibu tena!' : 'Welcome back!'
-        );
+        Alert.alert('✅ ' + t('success'), t('welcome_back'));
         onAuthSuccess();
       }
     } catch (e) { console.error(e); }
@@ -77,24 +75,18 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
   async function handleRegister() {
     if (!name.trim() || !phone.trim() || !age.trim() || !condition.trim()) {
-      Alert.alert(
-        language === 'sw' ? 'Kosa' : 'Error',
-        language === 'sw' ? 'Tafadhali jaza sehemu zote.' : 'Please fill all fields.'
-      );
+      Alert.alert(t('error'), t('fill_all_fields'));
       return;
     }
     if (pin.length !== PIN_LENGTH || pin !== confirmPin) {
-      Alert.alert(
-        language === 'sw' ? 'PIN hailingani' : 'PIN Mismatch',
-        language === 'sw' ? `Tafadhali ingiza PIN yenye tarakimu ${PIN_LENGTH} na uhakikishe inalingana.` : `Enter a ${PIN_LENGTH}-digit PIN and confirm it matches.`
-      );
+      Alert.alert(t('pin_mismatch'), t('pin_mismatch_body'));
       return;
     }
     setRegistering(true);
     try {
       const user = { name: name.trim(), phone: phone.trim(), age: parseInt(age.trim(), 10), condition: condition.trim(), pin, createdAt: new Date().toISOString() };
       await saveUser(user);
-      Alert.alert(language === 'sw' ? '✅ Umesajiliwa' : '✅ Registered', language === 'sw' ? `Karibu ${user.name}!` : `Welcome ${user.name}!`);
+      Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       onAuthSuccess();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setRegistering(false); }
@@ -102,13 +94,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
   async function handleLogin() {
     if (loginPin.length !== PIN_LENGTH) {
-      Alert.alert(language === 'sw' ? 'PIN si sahihi' : 'Invalid PIN', language === 'sw' ? `Tafadhali ingiza PIN yenye tarakimu ${PIN_LENGTH}.` : `Please enter your ${PIN_LENGTH}-digit PIN.`);
+      Alert.alert(t('invalid_pin'), `${t('invalid_pin')}. ${t('fill_all_fields')}`);
       return;
     }
     try {
       const user = await getUser();
       if (user && user.pin === loginPin) onAuthSuccess();
-      else Alert.alert(language === 'sw' ? 'PIN si sahihi' : 'Wrong PIN', language === 'sw' ? 'PIN ulioingiza hailingani. Tafadhali jaribu tena.' : 'The PIN you entered does not match.');
+      else Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
@@ -128,64 +120,64 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           <View style={styles.header}>
             <MaterialCommunityIcons name="heart-pulse" size={40} color="#fff" />
             <Text style={styles.appName}>MediSauti</Text>
-            <Text style={styles.tagline}>{language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}</Text>
+            <Text style={styles.tagline}>{t('tagline')}</Text>
           </View>
 
           <View style={styles.langRow}>
             {['sw', 'en'].map(l => (
               <TouchableOpacity key={l} style={[styles.langBtn, language === l && styles.langBtnActive]} onPress={() => setLanguage(l)}>
-                <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>{l === 'sw' ? 'Kiswahili' : 'English'}</Text>
+                <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>{l === 'sw' ? t('swahili') : t('english')}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
           {mode === 'register' ? (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{language === 'sw' ? 'Jisajili' : 'Register'}</Text>
-              <Text style={styles.cardSub}>{language === 'sw' ? 'Tafadhali jaza taarifa zako za matibabu.' : 'Please fill in your medical information.'}</Text>
+              <Text style={styles.cardTitle}>{t('card_register_title')}</Text>
+              <Text style={styles.cardSub}>{t('card_register_subtitle')}</Text>
 
-              <Input label={language === 'sw' ? 'Jina kamili' : 'Full name'} value={name} onChangeText={setName} placeholder="e.g. Darius Kamau" />
-              <Input label={language === 'sw' ? 'Nambari ya simu' : 'Phone number'} value={phone} onChangeText={setPhone} placeholder="e.g. 0712345678" keyboardType="phone-pad" />
-              <Input label={language === 'sw' ? 'Umri' : 'Age'} value={age} onChangeText={setAge} placeholder="e.g. 45" keyboardType="number-pad" />
-              <Input label={language === 'sw' ? 'Hali ya kiafya' : 'Medical condition'} value={condition} onChangeText={setCondition} placeholder="e.g. Diabetes" />
-              <Input label={language === 'sw' ? 'Weka PIN (tarakimu 4)' : 'Set PIN (4 digits)'} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
-              <Input label={language === 'sw' ? 'Thibitisha PIN' : 'Confirm PIN'} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <Input label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} />
+              <Input label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" />
+              <Input label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
+              <Input label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} />
+              <Input label={t('label_set_pin')} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <Input label={t('label_confirm_pin')} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
               <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={registering}>
-                {registering ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{language === 'sw' ? 'Jisajili' : 'Register'}</Text>}
+                {registering ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('btn_register')}</Text>}
               </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{language === 'sw' ? 'Ingia' : 'Login'}</Text>
-              <Text style={styles.cardSub}>{language === 'sw' ? 'Ingiza PIN yako au tumia alama ya uso / kidole.' : 'Enter your PIN or use face/fingerprint to continue.'}</Text>
+              <Text style={styles.cardTitle}>{t('card_login_title')}</Text>
+              <Text style={styles.cardSub}>{t('card_login_subtitle')}</Text>
 
               {biometricAvailable && (
                 <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
                   <Animated.View style={{ transform: [{ scale: pulse }] }}>
                     <MaterialCommunityIcons name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'} size={48} color={COLORS.primary} />
                   </Animated.View>
-                  <Text style={styles.biometricText}>{language === 'sw' ? 'Tumia alama ya uso / kidole' : 'Use face / fingerprint'}</Text>
+                  <Text style={styles.biometricText}>{t('btn_biometric')}</Text>
                 </TouchableOpacity>
               )}
 
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>{language === 'sw' ? 'AU ingiza PIN' : 'OR enter PIN'}</Text>
+                <Text style={styles.dividerText}>{t('or_enter_pin')}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
-              <Input label={language === 'sw' ? 'PIN yako' : 'Your PIN'} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <Input label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
               <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
-                <Text style={styles.primaryBtnText}>{language === 'sw' ? 'Ingia' : 'Login'}</Text>
+                <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {isRegistered && mode === 'login' && (
             <TouchableOpacity style={styles.switchBtn} onPress={() => { setIsRegistered(false); setMode('register'); }}>
-              <Text style={styles.switchBtnText}>{language === 'sw' ? 'Sajili mtumiaji mpya' : 'Register a new user'}</Text>
+              <Text style={styles.switchBtnText}>{t('switch_to_register')}</Text>
             </TouchableOpacity>
           )}
         </ScrollView>

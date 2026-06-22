@@ -11,10 +11,12 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, saveUser } from '../utils/storage';
+import { useLanguage } from '../utils/LanguageContext';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { language, toggleLanguage, t } = useLanguage();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -45,7 +47,7 @@ export default function ProfileScreen() {
   async function handlePickAvatar() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow access to photos to change your profile picture.');
+      Alert.alert(t('permission_title'), t('permission_desc'));
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -61,7 +63,7 @@ export default function ProfileScreen() {
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert('Error', 'Name is required.');
+      Alert.alert(t('error'), t('error_name_required'));
       return;
     }
     setSaving(true);
@@ -75,7 +77,7 @@ export default function ProfileScreen() {
         condition: condition.trim(),
         avatar: avatarUri,
       });
-      Alert.alert('Saved', 'Profile updated successfully.');
+      Alert.alert(t('saved'), t('saved_profile'));
       navigation.goBack();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
@@ -91,7 +93,7 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.onSurface} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>{t('header_profile')}</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -123,21 +125,21 @@ export default function ProfileScreen() {
                     <MaterialCommunityIcons name="camera" size={14} color="#fff" />
                   </View>
                 </TouchableOpacity>
-                <Text style={styles.avatarHint}>Tap to change photo</Text>
+                <Text style={styles.avatarHint}>{t('tap_change_photo')}</Text>
               </View>
 
               {/* ── Form ── */}
               <View style={styles.formCard}>
-                <ProfileField label="Full name" value={name} onChangeText={setName} placeholder="e.g. Darius Kamau" />
-                <ProfileField label="Phone number" value={phone} onChangeText={setPhone} placeholder="e.g. 0712345678" keyboardType="phone-pad" />
-                <ProfileField label="Age" value={age} onChangeText={setAge} placeholder="e.g. 45" keyboardType="number-pad" />
-                <ProfileField label="Medical condition" value={condition} onChangeText={setCondition} placeholder="e.g. Diabetes" multiline />
+                <ProfileField label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} />
+                <ProfileField label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" />
+                <ProfileField label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
+                <ProfileField label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} multiline />
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
                   {saving ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Text style={styles.saveBtnText}>Save Changes</Text>
+                    <Text style={styles.saveBtnText}>{t('btn_save_changes')}</Text>
                   )}
                 </TouchableOpacity>
               </View>

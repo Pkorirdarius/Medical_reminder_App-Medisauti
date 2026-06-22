@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
+import { useLanguage } from '../utils/LanguageContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
 function timeToMinutes(t) {
@@ -41,7 +42,8 @@ function buildReminders(meds) {
   return list;
 }
 
-function ReminderCard({ item, doseStatus, onAction, language }) {
+function ReminderCard({ item, doseStatus, onAction }) {
+  const { t } = useLanguage();
   const status = doseStatus[item.key];
   const isTaken = status === 'taken';
   const isSnoozed = status === 'snoozed';
@@ -89,7 +91,7 @@ function ReminderCard({ item, doseStatus, onAction, language }) {
               color={isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400]}
             />
             <Text style={[styles.statusText, { color: isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400] }]}>
-              {isTaken ? 'Taken' : isSnoozed ? 'Snoozed' : 'Missed'}
+              {isTaken ? t('status_taken') : isSnoozed ? t('status_snoozed') : t('status_missed')}
             </Text>
           </View>
         )}
@@ -102,13 +104,13 @@ export default function RemindersScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
   const [user, setUser] = useState({ name: 'User' });
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [language, setLanguage] = useState('sw');
   const [doseStatus, setDoseStatus] = useState({});
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -140,10 +142,7 @@ export default function RemindersScreen() {
       const label = getTimeLabel(item.time, language);
       speakReminder(item.drugName.split(' ')[0], item.dosage || '', label, 'sw');
     } else if (action === 'snoozed') {
-      Alert.alert(
-        language === 'sw' ? 'Kikumbusho' : 'Reminder',
-        language === 'sw' ? 'Tutakukumbusha tena baada ya dakika 15.' : 'We will remind you again in 15 minutes.'
-      );
+      Alert.alert(t('snooze_alert_title'), t('snooze_alert_body'));
     }
   }
 
@@ -155,10 +154,10 @@ export default function RemindersScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <MaterialCommunityIcons name="bell-ring-outline" size={28} color={COLORS.primary} />
-          <Text style={styles.headerTitle}>Vikumbusho</Text>
+          <Text style={styles.headerTitle}>{t('header_reminders')}</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
@@ -183,9 +182,9 @@ export default function RemindersScreen() {
           {/* Legend */}
           <View style={styles.legend}>
             {[
-              { icon: 'check-circle', label: 'Taken', color: COLORS.green[400] },
-              { icon: 'clock-outline', label: 'Snoozed', color: COLORS.amber[400] },
-              { icon: 'close-circle', label: 'Missed', color: COLORS.red[400] },
+              { icon: 'check-circle', label: t('status_taken'), color: COLORS.green[400] },
+              { icon: 'clock-outline', label: t('status_snoozed'), color: COLORS.amber[400] },
+              { icon: 'close-circle', label: t('status_missed'), color: COLORS.red[400] },
             ].map(({ icon, label, color }) => (
               <View key={label} style={styles.legendItem}>
                 <MaterialCommunityIcons name={icon} size={14} color={color} />
@@ -197,25 +196,25 @@ export default function RemindersScreen() {
           {reminders.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="bell-off-outline" size={56} color={COLORS.outline} />
-              <Text style={styles.emptyTitle}>{language === 'sw' ? 'Hakuna vikumbusho' : 'No reminders'}</Text>
-              <Text style={styles.emptySub}>{language === 'sw' ? 'Ongeza dawa katika kichupo cha "Dawa" ili kupata vikumbusho.' : 'Add medications in the "Dawa" tab to get reminders.'}</Text>
+              <Text style={styles.emptyTitle}>{t('empty_reminders_title')}</Text>
+              <Text style={styles.emptySub}>{t('empty_reminders_sub')}</Text>
             </View>
           ) : (
             <>
               {upcoming.length > 0 && (
                 <>
-                  <Text style={styles.sectionLabel}>Upcoming</Text>
+                  <Text style={styles.sectionLabel}>{t('section_upcoming')}</Text>
                   {upcoming.map(r => (
-                    <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
+                    <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} />
                   ))}
                 </>
               )}
-              <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Earlier today</Text>
+              <Text style={[styles.sectionLabel, { marginTop: 16 }]}>{t('section_earlier')}</Text>
               {earlier.length === 0 ? (
-                <Text style={styles.noEarlier}>{language === 'sw' ? 'Hakuna vikumbusho vya awali.' : 'No earlier reminders.'}</Text>
+                <Text style={styles.noEarlier}>{t('no_earlier_reminders')}</Text>
               ) : (
                 earlier.map(r => (
-                  <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
+                  <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} />
                 ))
               )}
             </>

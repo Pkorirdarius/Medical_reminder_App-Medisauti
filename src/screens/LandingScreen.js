@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { useLanguage } from '../utils/LanguageContext';
 
 export default function LandingScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [language, setLanguage] = useState('sw');
+  const { language, setLanguage, t } = useLanguage();
 
   return (
     <ScrollView
@@ -24,7 +25,7 @@ export default function LandingScreen({ navigation }) {
             onPress={() => setLanguage(l)}
           >
             <Text style={[styles.langBtnText, language === l && styles.langBtnTextActive]}>
-              {l === 'sw' ? 'Kiswahili' : 'English'}
+              {l === 'sw' ? t('swahili') : t('english')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -35,14 +36,8 @@ export default function LandingScreen({ navigation }) {
           <MaterialCommunityIcons name="heart-pulse" size={48} color="#fff" />
         </View>
         <Text style={styles.appName}>MediSauti</Text>
-        <Text style={styles.tagline}>
-          {language === 'sw' ? 'Dawa yako, afya yako' : 'Your meds, your health'}
-        </Text>
-        <Text style={styles.description}>
-          {language === 'sw'
-            ? 'Panga ratiba ya dawa zako, pata vikumbusho, na fuata maendeleo ya afya yako.'
-            : 'Schedule your medications, get reminders, and track your health progress.'}
-        </Text>
+        <Text style={styles.tagline}>{t('tagline')}</Text>
+        <Text style={styles.description}>{t('landing_desc')}</Text>
       </View>
 
       <View style={styles.actionsCard}>
@@ -53,18 +48,14 @@ export default function LandingScreen({ navigation }) {
         >
           <MaterialCommunityIcons name="shield-lock-outline" size={24} color="#fff" />
           <View style={styles.btnTextWrap}>
-            <Text style={styles.loginBtnLabel}>
-              {language === 'sw' ? 'Ingia' : 'Login'}
-            </Text>
-            <Text style={styles.loginBtnSub}>
-              {language === 'sw' ? 'Tumia PIN au alama ya uso' : 'Use PIN or biometrics'}
-            </Text>
+            <Text style={styles.loginBtnLabel}>{t('login')}</Text>
+            <Text style={styles.loginBtnSub}>{t('login_sub')}</Text>
           </View>
         </TouchableOpacity>
 
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>{language === 'sw' ? 'AU' : 'OR'}</Text>
+          <Text style={styles.dividerText}>{t('or_divider')}</Text>
           <View style={styles.dividerLine} />
         </View>
 
@@ -75,12 +66,8 @@ export default function LandingScreen({ navigation }) {
         >
           <MaterialCommunityIcons name="account-plus-outline" size={24} color={COLORS.primary} />
           <View style={styles.btnTextWrap}>
-            <Text style={styles.registerBtnLabel}>
-              {language === 'sw' ? 'Jisajili' : 'Register'}
-            </Text>
-            <Text style={styles.registerBtnSub}>
-              {language === 'sw' ? 'Unda akaunti mpya' : 'Create a new account'}
-            </Text>
+            <Text style={styles.registerBtnLabel}>{t('register')}</Text>
+            <Text style={styles.registerBtnSub}>{t('register_sub')}</Text>
           </View>
         </TouchableOpacity>
       </View>

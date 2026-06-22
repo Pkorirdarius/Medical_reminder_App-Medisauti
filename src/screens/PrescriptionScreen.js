@@ -11,6 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, savePrescription, deletePrescription, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
+import { useLanguage } from '../utils/LanguageContext';
 import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
 
 const INITIAL_FORM = {
@@ -34,7 +35,8 @@ function FormInput({ label, value, onChangeText, placeholder, keyboardType, mult
   );
 }
 
-function PrescriptionCard({ item, onDelete, language }) {
+function PrescriptionCard({ item, onDelete }) {
+  const { t } = useLanguage();
   return (
     <View style={styles.medCard}>
       <View style={styles.medCardHeader}>
@@ -49,7 +51,7 @@ function PrescriptionCard({ item, onDelete, language }) {
           {item.source === 'doctor' && (
             <View style={styles.docBadge}>
               <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
-              <Text style={styles.docBadgeText}>Daktari</Text>
+              <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
             </View>
           )}
         </View>
@@ -66,14 +68,13 @@ export default function PrescriptionScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
   const [user, setUser] = useState({ name: 'User' });
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [language, setLanguage] = useState('sw');
-  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -97,7 +98,7 @@ export default function PrescriptionScreen() {
 
   async function handleSave() {
     if (!form.drugName.trim() || !form.dosage.trim()) {
-      Alert.alert(language === 'sw' ? 'Hitilafu' : 'Error', language === 'sw' ? 'Tafadhali jaza jina na kipimo cha dawa.' : 'Please fill drug name and dosage.');
+      Alert.alert(t('error'), t('validation_error'));
       return;
     }
     setSaving(true);
@@ -123,22 +124,17 @@ export default function PrescriptionScreen() {
       await savePrescription(prescription);
       await loadData();
       resetForm();
-      Alert.alert(
-        language === 'sw' ? '✅ Imehifadhiwa' : '✅ Saved',
-        language === 'sw' ? `Dawa ya ${prescription.drugName} imehifadhiwa na vikumbusho vimewekwa.` : `${prescription.drugName} saved and reminders scheduled.`
-      );
+      Alert.alert('✅ ' + t('saved_success_title'), t('saved_success'));
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
   }
 
   async function handleDelete(item) {
-    Alert.alert(
-      language === 'sw' ? 'Futa dawa?' : 'Delete medication?',
-      language === 'sw' ? 'Una uhakika unataka kufuta dawa hii?' : 'Are you sure you want to delete this medication?',
+    Alert.alert(t('delete_title'), t('delete_body'),
       [
-        { text: language === 'sw' ? 'Hapana' : 'Cancel', style: 'cancel' },
+        { text: t('no'), style: 'cancel' },
         {
-          text: language === 'sw' ? 'Futa' : 'Delete', style: 'destructive',
+          text: t('delete'), style: 'destructive',
           onPress: async () => {
             for (const n of item.notifIds || []) { try { await cancelReminder(n.nid); } catch (e) {} }
             await deletePrescription(item.id);
@@ -154,10 +150,10 @@ export default function PrescriptionScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <MaterialCommunityIcons name="pill" size={28} color={COLORS.primary} />
-          <Text style={styles.headerTitle}>Dawa</Text>
+          <Text style={styles.headerTitle}>{t('header_medications')}</Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => setLanguage(l => l === 'sw' ? 'en' : 'sw')} style={styles.iconBtn}>
+          <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
         <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
@@ -182,18 +178,18 @@ export default function PrescriptionScreen() {
           <>
             <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7}>
               <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
-              <Text style={styles.addBtnText}>{language === 'sw' ? 'Ongeza dawa' : 'Add medication'}</Text>
+              <Text style={styles.addBtnText}>{t('add_medication')}</Text>
             </TouchableOpacity>
 
             {prescriptions.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
-                <Text style={styles.emptyTitle}>{language === 'sw' ? 'Hakuna dawa' : 'No medications'}</Text>
-                <Text style={styles.emptySub}>{language === 'sw' ? 'Bonyeza kituo cha juu kuongeza dawa yako ya kwanza.' : 'Tap the button above to add your first medication.'}</Text>
+                <Text style={styles.emptyTitle}>{t('empty_medications_title')}</Text>
+                <Text style={styles.emptySub}>{t('empty_medications_sub')}</Text>
               </View>
             ) : (
               prescriptions.map((item, i) => (
-                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} language={language} />
+                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} />
               ))
             )}
           </>
@@ -208,29 +204,29 @@ export default function PrescriptionScreen() {
         >
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={resetForm}>
-              <Text style={styles.modalCancel}>{language === 'sw' ? 'Ghairi' : 'Cancel'}</Text>
+              <Text style={styles.modalCancel}>{t('cancel')}</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>{language === 'sw' ? 'Dawa mpya' : 'New medication'}</Text>
+            <Text style={styles.modalTitle}>{t('modal_new_med')}</Text>
             <TouchableOpacity onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.modalSave}>{language === 'sw' ? 'Hifadhi' : 'Save'}</Text>}
+              {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.modalSave}>{t('save')}</Text>}
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <FormInput label={language === 'sw' ? 'Jina la dawa' : 'Drug name'} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder="e.g. Amoxicillin" />
-            <FormInput label={language === 'sw' ? 'Kipimo' : 'Dosage'} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder="e.g. 500mg" />
-            <FormInput label={language === 'sw' ? 'Mara' : 'Frequency'} value={form.frequency} onChangeText={v => setForm(f => ({ ...f, frequency: v }))} placeholder="e.g. Twice daily" />
-            <FormInput label={language === 'sw' ? 'Nyakati — separate with comma' : 'Times'} value={form.times.join(', ')} onChangeText={v => setForm(f => ({ ...f, times: v.split(',').map(t => normalizeTime(t.trim())) }))} placeholder="08:00, 20:00" />
-            <FormInput label={language === 'sw' ? 'Maelezo (optional)' : 'Notes (optional)'} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={language === 'sw' ? 'e.g. Na chakula' : 'e.g. With food'} multiline />
+            <FormInput label={t('label_drug_name')} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder={t('placeholder_drug_name')} />
+            <FormInput label={t('label_dosage')} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder={t('placeholder_dosage')} />
+            <FormInput label={t('label_frequency')} value={form.frequency} onChangeText={v => setForm(f => ({ ...f, frequency: v }))} placeholder={t('placeholder_frequency')} />
+            <FormInput label={`${t('label_times')} — ${t('times_instruction')}`} value={form.times.join(', ')} onChangeText={v => setForm(f => ({ ...f, times: v.split(',').map(t => normalizeTime(t.trim())) }))} placeholder={t('placeholder_times')} />
+            <FormInput label={t('label_notes')} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('placeholder_notes')} multiline />
             <View style={styles.sourceRow}>
-              <Text style={styles.inputLabel}>{language === 'sw' ? 'Chanzo' : 'Source'}</Text>
+              <Text style={styles.inputLabel}>{t('label_source')}</Text>
               <View style={styles.sourceToggle}>
                 <TouchableOpacity style={[styles.sourceOpt, form.source === 'manual' && styles.sourceOptActive]} onPress={() => setForm(f => ({ ...f, source: 'manual' }))}>
                   <MaterialCommunityIcons name="pencil-outline" size={16} color={form.source === 'manual' ? '#fff' : COLORS.onSurfaceVariant} />
-                  <Text style={[styles.sourceOptText, form.source === 'manual' && styles.sourceOptTextActive]}>Manual</Text>
+                  <Text style={[styles.sourceOptText, form.source === 'manual' && styles.sourceOptTextActive]}>{t('source_manual')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.sourceOpt, form.source === 'doctor' && styles.sourceOptActive]} onPress={() => setForm(f => ({ ...f, source: 'doctor' }))}>
                   <MaterialCommunityIcons name="stethoscope" size={16} color={form.source === 'doctor' ? '#fff' : COLORS.onSurfaceVariant} />
-                  <Text style={[styles.sourceOptText, form.source === 'doctor' && styles.sourceOptTextActive]}>Daktari</Text>
+                  <Text style={[styles.sourceOptText, form.source === 'doctor' && styles.sourceOptTextActive]}>{t('source_doctor')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
