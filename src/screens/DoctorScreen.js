@@ -8,7 +8,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { COLORS, RADIUS, FONT } from '../utils/constants';
-import { getUser, getPrescriptions, savePrescription, calcAdherence, getDailyStreak } from '../utils/storage';
+import { getUser, getPrescriptions, savePrescription, calcAdherence, getDailyStreak, getLogs } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
 
 const CONDITION_ICONS = {
@@ -27,8 +27,9 @@ export default function DoctorScreen() {
 
   const [patient, setPatient] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
-  const [adherence, setAdherence] = useState({ rate: 0, taken: 0, missed: 0 });
+  const [adherence, setAdherence] = useState({ rate: 0, taken: 0, missed: 0, total: 0 });
   const [streak, setStreak] = useState([]);
+  const [recentLogs, setRecentLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDoctor, setIsDoctor] = useState(false);
 
@@ -43,13 +44,14 @@ export default function DoctorScreen() {
         return;
       }
       setIsDoctor(true);
-      const [meds, adh, stk] = await Promise.all([
-        getPrescriptions(), calcAdherence(30), getDailyStreak(7),
+      const [meds, adh, stk, logs] = await Promise.all([
+        getPrescriptions(), calcAdherence(30), getDailyStreak(7), getLogs(),
       ]);
       setPatient(u);
       setPrescriptions(meds);
       setAdherence(adh);
       setStreak(stk);
+      setRecentLogs(logs.slice(-5).reverse());
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
@@ -189,7 +191,77 @@ export default function DoctorScreen() {
           </View>
         </View>
 
-        {/* Active Prescriptions */}
+        {/* Adherence Detail */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('adherence_detail')}</Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1, alignItems: 'center', padding: 12, backgroundColor: COLORS.goal[50], borderRadius: RADIUS.lg }}>
+              <Text style={{ fontSize: 22, fontFamily: FONT.headline, color: COLORS.goal[600] }}>{adherence.taken}</Text>
+              <Text style={{ fontSize: 11, fontFamily: FONT.body, color: COLORS.goal[700], marginTop: 2 }}>{t('doses_taken')}</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center', padding: 12, backgroundColor: COLORS.error + '18', borderRadius: RADIUS.lg }}>
+              <Text style={{ fontSize: 22, fontFamily: FONT.headline, color: COLORS.error }}>{adherence.missed}</Text>
+              <Text style={{ fontSize: 11, fontFamily: FONT.body, color: COLORS.error, marginTop: 2 }}>{t('doses_missed')}</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center', padding: 12, backgroundColor: COLORS.surfaceHigh, borderRadius: RADIUS.lg }}>
+              <Text style={{ fontSize: 22, fontFamily: FONT.headline, color: COLORS.onSurface }}>{adherence.total}</Text>
+              <Text style={{ fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 2 }}>Total</Text>
+            </View>
+          </View>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: COLORS.surfaceHigh, marginTop: 10, overflow: 'hidden' }}>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: adherence.rate >= 70 ? COLORS.goal[500] : COLORS.warning, width: `${adherence.rate}%` }} />
+          </View>
+        </View>
+
+        {/* Source Breakdown */}
+        {(() => {
+          const doctorRx = prescriptions.filter(r => r.source === 'doctor').length;
+          const manualRx = prescriptions.filter(r => r.source !== 'doctor').length;
+          return (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{t('source_breakdown')}</Text>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <MaterialCommunityIcons name="stethoscope" size={16} color={COLORS.blue[800]} />
+                  <Text style={{ fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurface }}>{t('source_doctor')}: <Text style={{ fontFamily: FONT.bodyBold }}>{doctorRx}</Text></Text>
+                </View>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <MaterialCommunityIcons name="pencil" size={16} color={COLORS.outline} />
+                  <Text style={{ fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurface }}>{t('source_manual')}: <Text style={{ fontFamily: FONT.bodyBold }}>{manualRx}</Text></Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Recent Activity */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('recent_activity')}</Text>
+          {recentLogs.length === 0 ? (
+            <Text style={styles.emptySub}>{t('no_recent_activity')}</Text>
+          ) : (
+            recentLogs.map((log, i) => {
+              const rx = prescriptions.find(p => p.id === log.prescriptionId);
+              const time = new Date(log.loggedAt);
+              return (
+                <View key={log.id || i} style={[styles.rxItem, { borderBottomWidth: i < recentLogs.length - 1 ? 0.5 : 0 }]}>
+                  <MaterialCommunityIcons
+                    name={log.status === 'taken' ? 'check-circle' : log.status === 'missed' ? 'close-circle' : 'clock-outline'}
+                    size={16}
+                    color={log.status === 'taken' ? COLORS.goal[500] : log.status === 'missed' ? COLORS.error : COLORS.outline}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rxName}>{rx?.drugName || t('unknown')}</Text>
+                    <Text style={styles.rxDetail}>{time.toLocaleDateString()} {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+                  </View>
+                  <Text style={[styles.rxSourceText, { color: log.status === 'taken' ? COLORS.goal[600] : COLORS.error }]}>
+                    {log.status === 'taken' ? t('doses_taken') : log.status === 'missed' ? t('doses_missed') : log.status}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('all_medications')} ({prescriptions.length})</Text>
           {prescriptions.length === 0 ? (

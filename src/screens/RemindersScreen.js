@@ -42,7 +42,7 @@ function buildReminders(meds) {
   return list;
 }
 
-function ReminderCard({ item, doseStatus, onAction }) {
+function ReminderCard({ item, doseStatus, onAction, language }) {
   const { t } = useLanguage();
   const status = doseStatus[item.key];
   const isTaken = status === 'taken';
@@ -53,7 +53,7 @@ function ReminderCard({ item, doseStatus, onAction }) {
     <View style={[
       styles.remCard,
       item.isCurrent && styles.remCardCurrent,
-      isPast && !status && styles.remCardPast,
+      item.isPast && !status && styles.remCardPast,
       (isTaken || isMissed) && { opacity: 0.55 },
     ]}>
       <TouchableOpacity style={styles.remCardBody} activeOpacity={0.7}>
@@ -205,7 +205,7 @@ export default function RemindersScreen() {
                 <>
                   <Text style={styles.sectionLabel}>{t('section_upcoming')}</Text>
                   {upcoming.map(r => (
-                    <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} />
+                    <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
                   ))}
                 </>
               )}
@@ -214,7 +214,7 @@ export default function RemindersScreen() {
                 <Text style={styles.noEarlier}>{t('no_earlier_reminders')}</Text>
               ) : (
                 earlier.map(r => (
-                  <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} />
+                  <ReminderCard key={r.key} item={r} doseStatus={doseStatus} onAction={handleAction} language={language} />
                 ))
               )}
             </>

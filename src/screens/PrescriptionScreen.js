@@ -17,6 +17,7 @@ import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
 import { OCR_WEBVIEW_HTML, parseOCRText } from '../utils/ocr';
+import { parseWithAI, hasProvider, getProvider } from '../utils/ai';
 
 const INITIAL_FORM = {
   drugName: '', dosage: '', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
@@ -84,6 +85,7 @@ export default function PrescriptionScreen() {
   const [saving, setSaving] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrMode, setOcrMode] = useState(null); // 'ai' | 'regex' | null
   const webviewRef = useRef(null);
   const pendingImageUri = useRef(null);
 
@@ -146,6 +148,38 @@ export default function PrescriptionScreen() {
     }, 500);
   }
 
+  function applyParsed(parsed) {
+    setForm(f => ({
+      ...f,
+      drugName: parsed.drugName || f.drugName,
+      dosage: parsed.dosage || f.dosage,
+      frequency: parsed.frequency || f.frequency,
+      times: parsed.times?.length > 0 ? parsed.times : f.times,
+      source: 'manual',
+    }));
+    setShowForm(true);
+  }
+
+  async function handleOCRResult(rawText) {
+    setOcrProgress(95);
+    let parsed = null;
+    if (rawText.length > 5) {
+      if (!hasProvider()) {
+        Alert.alert(t('ocr_ai_title'), t('ocr_ai_no_key'));
+      }
+      parsed = await parseWithAI(rawText);
+    }
+    if (parsed) {
+      setOcrMode('ai');
+    } else {
+      setOcrMode('regex');
+      parsed = parseOCRText(rawText);
+    }
+    setOcrBusy(false);
+    pendingImageUri.current = null;
+    applyParsed(parsed);
+  }
+
   function handleOCRMessage(event) {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -156,18 +190,7 @@ export default function PrescriptionScreen() {
       } else if (msg.type === 'progress') {
         setOcrProgress(msg.progress);
       } else if (msg.type === 'result') {
-        setOcrBusy(false);
-        pendingImageUri.current = null;
-        const parsed = parseOCRText(msg.text);
-        setForm(f => ({
-          ...f,
-          drugName: parsed.drugName || f.drugName,
-          dosage: parsed.dosage || f.dosage,
-          frequency: parsed.frequency || f.frequency,
-          times: parsed.times.length > 0 ? parsed.times : f.times,
-          source: 'manual',
-        }));
-        setShowForm(true);
+        handleOCRResult(msg.text);
       } else if (msg.type === 'error') {
         setOcrBusy(false);
         pendingImageUri.current = null;
@@ -399,6 +422,22 @@ export default function PrescriptionScreen() {
               <View style={[styles.ocrProgFill, { width: `${ocrProgress}%` }]} />
             </View>
             <Text style={styles.ocrProgText}>{ocrProgress}%</Text>
+            {ocrMode && (
+              <View style={[styles.ocrModeBadge, {
+                backgroundColor: ocrMode === 'ai' ? COLORS.blue[50] : COLORS.surfaceHigh,
+              }]}>
+                <MaterialCommunityIcons
+                  name={ocrMode === 'ai' ? 'robot' : 'code-braces'}
+                  size={12}
+                  color={ocrMode === 'ai' ? COLORS.blue[800] : COLORS.outline}
+                />
+                <Text style={[styles.ocrModeText, {
+                  color: ocrMode === 'ai' ? COLORS.blue[800] : COLORS.outline,
+                }]}>
+                  {ocrMode === 'ai' ? (getProvider() || 'AI') : 'Local Regex'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -519,4 +558,6 @@ const styles = StyleSheet.create({
   ocrProgBg:      { height: 6, borderRadius: 3, backgroundColor: COLORS.surfaceHigh, width: '100%', overflow: 'hidden' },
   ocrProgFill:    { height: 6, borderRadius: 3, backgroundColor: COLORS.primary },
   ocrProgText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline },
+  ocrModeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, marginTop: 8 },
+  ocrModeText:    { fontSize: 10, fontFamily: FONT.bodySemiBold },
 });

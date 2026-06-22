@@ -31,6 +31,9 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [loginPin, setLoginPin] = useState('');
   const [loginRole, setLoginRole] = useState('patient');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [bioRegistering, setBioRegistering] = useState(false);
+  const [userBioPref, setUserBioPref] = useState(false);
+  const [optInBio, setOptInBio] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const [registering, setRegistering] = useState(false);
 
@@ -47,6 +50,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
   useEffect(() => { checkAuthStatus(); }, []);
 
+  useEffect(() => {
+    if (!loading && mode === 'login' && userBioPref && biometricAvailable) {
+      const timer = setTimeout(() => handleBiometricLogin(), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, mode, userBioPref, biometricAvailable]);
+
   async function checkAuthStatus() {
     try {
       const registered = await getIsRegistered();
@@ -54,6 +64,10 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       const hasBiometric = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       setBiometricAvailable(hasBiometric && enrolled);
+      if (registered) {
+        const u = await getUser();
+        if (u?.biometricEnabled) setUserBioPref(true);
+      }
       const initialMode = route?.params?.initialMode;
       if (initialMode) setMode(initialMode);
       else if (registered) setMode('login');
@@ -70,10 +84,29 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         disableDeviceFallback: false,
       });
       if (result.success) {
+        const u = await getUser();
+        const role = u?.role || loginRole;
         Alert.alert('✅ ' + t('success'), t('welcome_back'));
-        onAuthSuccess(loginRole);
+        onAuthSuccess(role);
       }
     } catch (e) { console.error(e); }
+  }
+
+  async function handleBiometricRegister() {
+    if (!biometricAvailable) return;
+    setBioRegistering(true);
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: t('bio_register_prompt'),
+        fallbackLabel: t('auth_use_pin'),
+        disableDeviceFallback: false,
+      });
+      if (result.success) {
+        setOptInBio(true);
+        Alert.alert('✅ ' + t('success'), t('bio_enrolled'));
+      }
+    } catch (e) { console.error(e); }
+    finally { setBioRegistering(false); }
   }
 
   async function handleRegister() {
@@ -102,6 +135,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         role,
         specialization: role === 'doctor' ? specialization.trim() : '',
         pin, createdAt: new Date().toISOString(),
+        biometricEnabled: optInBio,
       };
       await saveUser(user);
 
@@ -205,6 +239,30 @@ export default function AuthScreen({ onAuthSuccess, route }) {
               <Input label={t('label_set_pin')} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
               <Input label={t('label_confirm_pin')} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
+              {biometricAvailable && (
+                <TouchableOpacity
+                  style={[styles.bioOptIn, optInBio && styles.bioOptInActive]}
+                  onPress={bioRegistering ? null : optInBio ? () => setOptInBio(false) : handleBiometricRegister}
+                  activeOpacity={0.7}
+                  disabled={bioRegistering}
+                >
+                  <MaterialCommunityIcons
+                    name={optInBio ? 'check-circle' : Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
+                    size={22}
+                    color={optInBio ? COLORS.green[500] : COLORS.onSurfaceVariant}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.bioOptInTitle, optInBio && { color: COLORS.green[500] }]}>
+                      {optInBio ? t('bio_enabled_label') : t('bio_opt_in')}
+                    </Text>
+                    <Text style={styles.bioOptInDesc}>
+                      {optInBio ? t('bio_enabled_desc') : t('bio_opt_in_desc')}
+                    </Text>
+                  </View>
+                  {bioRegistering && <ActivityIndicator size="small" color={COLORS.primary} />}
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister} disabled={registering}>
                 {registering ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('btn_register')}</Text>}
               </TouchableOpacity>
@@ -233,11 +291,21 @@ export default function AuthScreen({ onAuthSuccess, route }) {
               </View>
 
               {biometricAvailable && (
-                <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
-                  <Animated.View style={{ transform: [{ scale: pulse }] }}>
-                    <MaterialCommunityIcons name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'} size={48} color={COLORS.primary} />
+                <TouchableOpacity
+                  style={[styles.biometricBtn, userBioPref && styles.biometricBtnPref]}
+                  onPress={handleBiometricLogin}
+                >
+                  <Animated.View style={{ transform: userBioPref ? [{ scale: pulse }] : [{ scale: 1 }] }}>
+                    <MaterialCommunityIcons
+                      name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
+                      size={userBioPref ? 52 : 48}
+                      color={userBioPref ? COLORS.primary : COLORS.primary}
+                    />
                   </Animated.View>
-                  <Text style={styles.biometricText}>{t('btn_biometric')}</Text>
+                  <Text style={styles.biometricText}>
+                    {userBioPref ? t('bio_tap_to_login') : t('btn_biometric')}
+                  </Text>
+                  {userBioPref && <Text style={styles.biometricSub}>{t('bio_pref_hint')}</Text>}
                 </TouchableOpacity>
               )}
 
@@ -322,11 +390,18 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#fff', fontSize: 16, fontFamily: FONT.bold },
 
   biometricBtn:   { alignItems: 'center', padding: 20, marginBottom: 8, backgroundColor: COLORS.primaryFixed + '25', borderRadius: RADIUS.xl },
+  biometricBtnPref: { backgroundColor: COLORS.primaryFixed + '40', borderWidth: 1, borderColor: COLORS.primary },
   biometricText:  { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.primary, marginTop: 8 },
+  biometricSub:   { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 2 },
 
   divider:        { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
   dividerLine:    { flex: 1, height: 0.5, backgroundColor: COLORS.surfaceHigh },
   dividerText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, marginHorizontal: 10 },
+
+  bioOptIn:       { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: RADIUS.lg, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh, marginBottom: 14 },
+  bioOptInActive: { backgroundColor: COLORS.green[50], borderColor: COLORS.green[400] },
+  bioOptInTitle:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
+  bioOptInDesc:   { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 1 },
 
   switchBtn:      { alignSelf: 'center', padding: 12 },
   switchBtnText:  { fontSize: 13, fontFamily: FONT.bodyMedium, textDecorationLine: 'underline' },
