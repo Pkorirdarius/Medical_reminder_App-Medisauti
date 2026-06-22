@@ -181,7 +181,7 @@ export default function PrescriptionScreen() {
 
             {prescriptions.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="pill-off" size={56} color={COLORS.outline} />
+                <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
                 <Text style={styles.emptyTitle}>{language === 'sw' ? 'Hakuna dawa' : 'No medications'}</Text>
                 <Text style={styles.emptySub}>{language === 'sw' ? 'Bonyeza kituo cha juu kuongeza dawa yako ya kwanza.' : 'Tap the button above to add your first medication.'}</Text>
               </View>

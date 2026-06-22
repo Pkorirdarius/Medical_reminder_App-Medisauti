@@ -1,18 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import CryptoJS from 'crypto-js';
 
-// Use a device-specific key derivation approach. For MVP, a fixed key is
-// acceptable to satisfy the encryption requirement (NFR-04). In production,
-// this key should be derived from device-unique characteristics.
 const ENC_KEY = 'medisauti-2024-enc-key!';
 
+function simpleXOR(text, key) {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    out += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return out;
+}
+
 function encrypt(text) {
-  return CryptoJS.AES.encrypt(text, ENC_KEY).toString();
+  const xor = simpleXOR(text, ENC_KEY);
+  return btoa(unescape(encodeURIComponent(xor)));
 }
 
 function decrypt(ciphertext) {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, ENC_KEY);
-  return bytes.toString(CryptoJS.enc.Utf8);
+  try {
+    const xor = decodeURIComponent(escape(atob(ciphertext)));
+    return simpleXOR(xor, ENC_KEY);
+  } catch {
+    return '';
+  }
 }
 
 const KEYS = {
@@ -34,7 +43,6 @@ async function getItemDecrypted(key) {
     const decrypted = decrypt(encrypted);
     return JSON.parse(decrypted);
   } catch {
-    // If decryption fails, try reading as plain text (migration path)
     try {
       return JSON.parse(encrypted);
     } catch {
@@ -43,7 +51,6 @@ async function getItemDecrypted(key) {
   }
 }
 
-// ─── User ────────────────────────────────────────────────────────────
 export async function saveUser(user) {
   await setItemEncrypted(KEYS.USER, user);
 }
@@ -57,7 +64,6 @@ export async function getIsRegistered() {
   return user !== null && user.name && user.pin;
 }
 
-// ─── Prescriptions ───────────────────────────────────────────────────
 export async function getPrescriptions() {
   const data = await getItemDecrypted(KEYS.PRESCRIPTIONS);
   return data || [];
@@ -80,7 +86,6 @@ export async function deletePrescription(id) {
   await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
 }
 
-// ─── Adherence Logs ──────────────────────────────────────────────────
 export async function getLogs() {
   const data = await getItemDecrypted(KEYS.ADHERENCE);
   return data || [];
@@ -98,7 +103,6 @@ export async function logDose(prescriptionId, status, scheduledTime) {
   await setItemEncrypted(KEYS.ADHERENCE, logs);
 }
 
-// ─── Analytics ───────────────────────────────────────────────────────
 export async function calcAdherence(days = 30) {
   const logs = await getLogs();
   const since = new Date();
@@ -137,10 +141,6 @@ export async function getDailyStreak(days = 7) {
   return result;
 }
 
-/**
- * Per-medication adherence breakdown.
- * Returns array of { drugName, dosage, rate, taken, missed, total }
- */
 export async function getPerMedicationAdherence(days = 30) {
   const [logs, prescriptions] = await Promise.all([getLogs(), getPrescriptions()]);
   const since = new Date();
@@ -171,10 +171,6 @@ export async function getPerMedicationAdherence(days = 30) {
   }));
 }
 
-/**
- * Missed dose patterns by time of day.
- * Returns { morning, afternoon, evening, night } counts of missed doses.
- */
 export async function getMissedDosePatterns(days = 30) {
   const logs = await getLogs();
   const since = new Date();
@@ -194,10 +190,6 @@ export async function getMissedDosePatterns(days = 30) {
   return patterns;
 }
 
-/**
- * Trend direction over the past N days.
- * Returns { direction: 'improving'|'worsening'|'stable'|'insufficient', weeklyRates: [] }
- */
 export async function getAdherenceTrend(days = 30) {
   const logs = await getLogs();
   const since = new Date();

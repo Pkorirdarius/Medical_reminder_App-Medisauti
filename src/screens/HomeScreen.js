@@ -296,7 +296,7 @@ export default function HomeScreen() {
               </View>
               {prescriptions.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <MaterialCommunityIcons name="pill-off" size={40} color={COLORS.outline} />
+                  <MaterialCommunityIcons name="pill" size={40} color={COLORS.outline} />
                   <Text style={styles.emptyText}>
                     Bado hujaongeza dawa. Bonyeza kichupo "Dawa" kuanza.
                     {'\n'}No meds added yet. Tap the "Dawa" tab to start.
