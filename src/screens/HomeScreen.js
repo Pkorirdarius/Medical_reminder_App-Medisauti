@@ -444,10 +444,10 @@ const styles = StyleSheet.create({
   weekDot:        { width: 20, height: 20, borderRadius: 6 },
   weekLabel:      { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
   doctorCard: {
-    backgroundColor: COLORS.secondaryContainer + '20',
+    backgroundColor: COLORS.surfaceLowest,
     flex: 0.7, alignItems: 'flex-start',
   },
-  doctorTip:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSecondaryFixedVariant, lineHeight: 16, marginTop: 4 },
+  doctorTip:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, lineHeight: 16, marginTop: 4 },
 
   /* ── Doctor Assign Card ── */
   doctorAssignCard: {
