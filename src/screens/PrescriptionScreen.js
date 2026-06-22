@@ -291,48 +291,48 @@ export default function PrescriptionScreen() {
       </View>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
-      >
-        {loading ? (
-          <ActivityIndicator style={{ marginTop: 60 }} color={COLORS.primary} />
-        ) : (
-          <>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
-              <Text style={styles.addBtnText}>{t('add_medication')}</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 60, flex: 1 }} color={COLORS.primary} />
+      ) : (
+        <>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
+            <Text style={styles.addBtnText}>{t('add_medication')}</Text>
+          </TouchableOpacity>
+
+          {/* OCR Scan Buttons */}
+          <View style={styles.ocrRow}>
+            <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRSnap} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="camera" size={20} color={COLORS.primary} />
+              <Text style={styles.ocrBtnText}>{t('header_scan')}</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRPick} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="image" size={20} color={COLORS.primary} />
+              <Text style={styles.ocrBtnText}>{t('recent_scans')}</Text>
+            </TouchableOpacity>
+          </View>
 
-            {/* OCR Scan Buttons */}
-            <View style={styles.ocrRow}>
-              <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRSnap} activeOpacity={0.7}>
-                <MaterialCommunityIcons name="camera" size={20} color={COLORS.primary} />
-                <Text style={styles.ocrBtnText}>{t('header_scan')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRPick} activeOpacity={0.7}>
-                <MaterialCommunityIcons name="image" size={20} color={COLORS.primary} />
-                <Text style={styles.ocrBtnText}>{t('recent_scans')}</Text>
-              </TouchableOpacity>
+          {prescriptions.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
+              <Text style={styles.emptyTitle}>{t('empty_medications_title')}</Text>
+              <Text style={styles.emptySub}>{t('empty_medications_sub')}</Text>
             </View>
-
-            {prescriptions.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
-                <Text style={styles.emptyTitle}>{t('empty_medications_title')}</Text>
-                <Text style={styles.emptySub}>{t('empty_medications_sub')}</Text>
-              </View>
-            ) : (
-              prescriptions.map((item, i) => (
+          ) : (
+            <ScrollView
+              ref={scrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+            >
+              {prescriptions.map((item, i) => (
                 <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} />
-              ))
-            )}
-          </>
-        )}
-      </ScrollView>
+              ))}
+            </ScrollView>
+          )}
+        </>
+      )}
 
       {/* ── Add/Edit Form Modal ── */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">

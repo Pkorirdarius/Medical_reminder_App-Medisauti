@@ -8,7 +8,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
-import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile } from '../utils/storage';
+import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
 
 const PIN_LENGTH = 4;
@@ -67,6 +67,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       if (registered) {
         const u = await getUser();
         if (u?.biometricEnabled) setUserBioPref(true);
+        if (u?.role) setLoginRole(u.role);
       }
       const initialMode = route?.params?.initialMode;
       if (initialMode) setMode(initialMode);
@@ -128,6 +129,27 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     setRegistering(true);
     try {
+      // Uniqueness checks
+      const existingUser = await getUser();
+      if (existingUser) {
+        if (existingUser.phone === phone.trim()) {
+          Alert.alert(t('error'), t('phone_taken'));
+          setRegistering(false);
+          return;
+        }
+        if (existingUser.pin === pin) {
+          Alert.alert(t('error'), t('pin_taken'));
+          setRegistering(false);
+          return;
+        }
+      }
+      const doctors = await getDoctors();
+      if (doctors.some(d => d.pin === pin)) {
+        Alert.alert(t('error'), t('pin_taken'));
+        setRegistering(false);
+        return;
+      }
+
       const user = {
         name: name.trim(), phone: phone.trim(),
         age: role === 'patient' ? parseInt(age.trim(), 10) : 0,
@@ -140,7 +162,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       await saveUser(user);
 
       if (role === 'doctor') {
-        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization });
+        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
         Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       } else {
         const added = await addConditionPrescriptions(user.condition);
@@ -162,15 +184,15 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     try {
       const user = await getUser();
-      if (user && user.pin === loginPin) {
-        if (user.role && user.role !== loginRole) {
-          Alert.alert(t('error'), t('wrong_pin'));
-          return;
-        }
-        onAuthSuccess(loginRole);
-      } else {
-        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+      if (!user) {
+        Alert.alert(t('error'), t('no_account_found'));
+        return;
       }
+      if (user.pin !== loginPin) {
+        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+        return;
+      }
+      onAuthSuccess(user.role || 'patient');
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
