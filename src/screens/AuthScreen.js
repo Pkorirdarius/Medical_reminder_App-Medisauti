@@ -8,7 +8,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
-import { saveUser, getUser, getIsRegistered } from '../utils/storage';
+import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
 
 const PIN_LENGTH = 4;
@@ -24,9 +24,12 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
   const [condition, setCondition] = useState('');
+  const [role, setRole] = useState('patient');
+  const [specialization, setSpecialization] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [loginPin, setLoginPin] = useState('');
+  const [loginRole, setLoginRole] = useState('patient');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const [registering, setRegistering] = useState(false);
@@ -68,13 +71,21 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       });
       if (result.success) {
         Alert.alert('✅ ' + t('success'), t('welcome_back'));
-        onAuthSuccess();
+        onAuthSuccess(loginRole);
       }
     } catch (e) { console.error(e); }
   }
 
   async function handleRegister() {
-    if (!name.trim() || !phone.trim() || !age.trim() || !condition.trim()) {
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert(t('error'), t('fill_all_fields'));
+      return;
+    }
+    if (role === 'patient' && (!age.trim() || !condition.trim())) {
+      Alert.alert(t('error'), t('fill_all_fields'));
+      return;
+    }
+    if (role === 'doctor' && !specialization.trim()) {
       Alert.alert(t('error'), t('fill_all_fields'));
       return;
     }
@@ -84,10 +95,28 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     setRegistering(true);
     try {
-      const user = { name: name.trim(), phone: phone.trim(), age: parseInt(age.trim(), 10), condition: condition.trim(), pin, createdAt: new Date().toISOString() };
+      const user = {
+        name: name.trim(), phone: phone.trim(),
+        age: role === 'patient' ? parseInt(age.trim(), 10) : 0,
+        condition: role === 'patient' ? condition.trim() : specialization.trim(),
+        role,
+        specialization: role === 'doctor' ? specialization.trim() : '',
+        pin, createdAt: new Date().toISOString(),
+      };
       await saveUser(user);
-      Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
-      onAuthSuccess();
+
+      if (role === 'doctor') {
+        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization });
+        Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
+      } else {
+        const added = await addConditionPrescriptions(user.condition);
+        if (added.length > 0) {
+          Alert.alert('✅ ' + t('auto_added_title'), t('auto_added_body').replace('{condition}', user.condition));
+        } else {
+          Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
+        }
+      }
+      onAuthSuccess(role);
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setRegistering(false); }
   }
@@ -99,8 +128,15 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     try {
       const user = await getUser();
-      if (user && user.pin === loginPin) onAuthSuccess();
-      else Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+      if (user && user.pin === loginPin) {
+        if (user.role && user.role !== loginRole) {
+          Alert.alert(t('error'), t('wrong_pin'));
+          return;
+        }
+        onAuthSuccess(loginRole);
+      } else {
+        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+      }
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
@@ -133,13 +169,39 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
           {mode === 'register' ? (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{t('card_register_title')}</Text>
-              <Text style={styles.cardSub}>{t('card_register_subtitle')}</Text>
+              <Text style={styles.cardTitle}>{role === 'doctor' ? t('doctor_register_title') : t('card_register_title')}</Text>
+              <Text style={styles.cardSub}>{role === 'doctor' ? t('doctor_register_subtitle') : t('card_register_subtitle')}</Text>
+
+              {/* Role Toggle */}
+              <View style={styles.roleRow}>
+                <Text style={styles.roleLabel}>{t('label_role')}</Text>
+                <View style={styles.roleToggle}>
+                  {['patient', 'doctor'].map(r => (
+                    <TouchableOpacity key={r} style={[styles.roleOpt, role === r && styles.roleOptActive]} onPress={() => setRole(r)}>
+                      <MaterialCommunityIcons
+                        name={r === 'doctor' ? 'stethoscope' : 'account'}
+                        size={14} color={role === r ? '#fff' : COLORS.outline}
+                      />
+                      <Text style={[styles.roleOptText, role === r && styles.roleOptTextActive]}>
+                        {r === 'doctor' ? t('role_doctor') : t('role_patient')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               <Input label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} />
               <Input label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" />
-              <Input label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
-              <Input label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} />
+
+              {role === 'patient' ? (
+                <>
+                  <Input label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
+                  <Input label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} />
+                </>
+              ) : (
+                <Input label={t('label_specialization')} value={specialization} onChangeText={setSpecialization} placeholder={t('placeholder_specialization')} />
+              )}
+
               <Input label={t('label_set_pin')} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
               <Input label={t('label_confirm_pin')} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
 
@@ -151,6 +213,24 @@ export default function AuthScreen({ onAuthSuccess, route }) {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{t('card_login_title')}</Text>
               <Text style={styles.cardSub}>{t('card_login_subtitle')}</Text>
+
+              {/* Login Role Toggle */}
+              <View style={styles.roleRow}>
+                <Text style={styles.roleLabel}>{t('login_as')}</Text>
+                <View style={styles.roleToggle}>
+                  {['patient', 'doctor'].map(r => (
+                    <TouchableOpacity key={r} style={[styles.roleOpt, loginRole === r && styles.roleOptActive]} onPress={() => setLoginRole(r)}>
+                      <MaterialCommunityIcons
+                        name={r === 'doctor' ? 'stethoscope' : 'account'}
+                        size={14} color={loginRole === r ? '#fff' : COLORS.outline}
+                      />
+                      <Text style={[styles.roleOptText, loginRole === r && styles.roleOptTextActive]}>
+                        {r === 'doctor' ? t('role_doctor') : t('role_patient')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
 
               {biometricAvailable && (
                 <TouchableOpacity style={styles.biometricBtn} onPress={handleBiometricLogin}>
@@ -224,6 +304,15 @@ const styles = StyleSheet.create({
   },
   cardTitle:      { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginBottom: 4 },
   cardSub:        { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginBottom: 20, lineHeight: 18 },
+
+  /* Role Toggle */
+  roleRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  roleLabel:      { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant },
+  roleToggle:     { flexDirection: 'row', gap: 6 },
+  roleOpt:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh },
+  roleOptActive:  { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  roleOptText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.outline },
+  roleOptTextActive: { color: '#fff' },
 
   inputRow:       { marginBottom: 14 },
   label:          { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, marginBottom: 4 },

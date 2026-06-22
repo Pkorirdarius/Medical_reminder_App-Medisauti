@@ -14,6 +14,7 @@ import PrescriptionScreen from '../screens/PrescriptionScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ReportScreen from '../screens/ReportScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import DoctorScreen from '../screens/DoctorScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -27,12 +28,20 @@ function ScanStack() {
   );
 }
 
-const TABS = [
+const PATIENT_TABS = [
   { name: 'Nyumbani',   label: 'Home',        icon: 'view-dashboard-outline',    iconActive: 'view-dashboard',       Component: HomeScreen },
   { name: 'Scan',       label: 'Scan',        icon: 'camera-enhance-outline',    iconActive: 'camera-enhance',       Component: ScanStack },
   { name: 'Dawa',       label: 'Meds',        icon: 'pill',                      iconActive: 'pill',                 Component: PrescriptionScreen },
   { name: 'Vikumbusho', label: 'Reminders',   icon: 'bell-ring-outline',         iconActive: 'bell-ring',            Component: RemindersScreen },
   { name: 'Ripoti',     label: 'Reports',     icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: ReportScreen },
+];
+
+const DOCTOR_TABS = [
+  { name: 'Nyumbani',   label: 'Home',        icon: 'view-dashboard-outline',    iconActive: 'view-dashboard',       Component: HomeScreen },
+  { name: 'Dawa',       label: 'Meds',        icon: 'pill',                      iconActive: 'pill',                 Component: PrescriptionScreen },
+  { name: 'Vikumbusho', label: 'Reminders',   icon: 'bell-ring-outline',         iconActive: 'bell-ring',            Component: RemindersScreen },
+  { name: 'Ripoti',     label: 'Reports',     icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: ReportScreen },
+  { name: 'Daktari',    label: 'Doctor',      icon: 'stethoscope',               iconActive: 'stethoscope',          Component: DoctorScreen },
 ];
 
 function TabIcon({ icon, iconActive, focused, label }) {
@@ -55,7 +64,8 @@ function TabIcon({ icon, iconActive, focused, label }) {
   );
 }
 
-function MainTabs() {
+function MainTabs({ userRole }) {
+  const tabs = userRole === 'doctor' ? DOCTOR_TABS : PATIENT_TABS;
   return (
     <Tab.Navigator
       screenOptions={{
@@ -76,7 +86,7 @@ function MainTabs() {
         tabBarShowLabel: false,
       }}
     >
-      {TABS.map(({ name, label, icon, iconActive, Component }) => (
+      {tabs.map(({ name, label, icon, iconActive, Component }) => (
         <Tab.Screen
           key={name}
           name={name}
@@ -95,10 +105,16 @@ function MainTabs() {
 export default function AppNavigator() {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState('patient');
 
   useEffect(() => {
     setReady(true);
   }, []);
+
+  function handleAuthSuccess(role) {
+    setUserRole(role || 'patient');
+    setAuthenticated(true);
+  }
 
   if (!ready) {
     return (
@@ -118,12 +134,14 @@ export default function AppNavigator() {
           <>
             <Stack.Screen name="Landing" component={LandingScreen} />
             <Stack.Screen name="Auth">
-              {props => <AuthScreen {...props} onAuthSuccess={() => setAuthenticated(true)} />}
+              {props => <AuthScreen {...props} onAuthSuccess={handleAuthSuccess} />}
             </Stack.Screen>
           </>
         ) : (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Main">
+              {() => <MainTabs userRole={userRole} />}
+            </Stack.Screen>
             <Stack.Screen name="Profile" component={ProfileScreen} />
           </>
         )}

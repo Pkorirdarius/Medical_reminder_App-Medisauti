@@ -1,14 +1,14 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Animated, RefreshControl, Dimensions,
+  ActivityIndicator, Animated, RefreshControl, Dimensions, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, getPrescriptions, calcAdherence } from '../utils/storage';
+import { getUser, getPrescriptions, calcAdherence, getDoctors, getMyDoctor, setMyDoctor } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
@@ -75,6 +75,8 @@ export default function HomeScreen() {
   const [speaking, setSpeaking]  = useState(false);
   const [loading, setLoading]    = useState(true);
   const [refreshing, setRef]     = useState(false);
+  const [myDoctor, setMyDoc]     = useState(null);
+  const [doctorsList, setDoctors] = useState([]);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -94,10 +96,12 @@ export default function HomeScreen() {
 
   async function loadData() {
     try {
-      const [u, meds, adh] = await Promise.all([getUser(), getPrescriptions(), calcAdherence(30)]);
+      const [u, meds, adh, docs, myDoc] = await Promise.all([getUser(), getPrescriptions(), calcAdherence(30), getDoctors(), getMyDoctor()]);
       if (u) setUser(u);
       setP(meds);
       setAdh(adh);
+      setDoctors(docs);
+      setMyDoc(myDoc);
       setNext(findNextReminder(meds));
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRef(false); }
@@ -126,6 +130,28 @@ export default function HomeScreen() {
     setSpeaking(true);
     speakReminder(nextReminder.drugName, nextReminder.dosage, getTimeLabel(nextReminder.nextTime, 'sw'), 'sw');
     setTimeout(() => setSpeaking(false), 5000);
+  }
+
+  function handleSelectDoctor() {
+    if (doctorsList.length === 0) {
+      Alert.alert(t('select_doctor'), t('no_doctors_available'));
+      return;
+    }
+    if (doctorsList.length <= 2) {
+      const buttons = doctorsList.map(d => ({
+        text: `${d.name} — ${d.specialization || t('role_doctor')}`,
+        onPress: () => { setMyDoc(d); setMyDoctor(d); },
+      }));
+      buttons.push({ text: t('cancel'), style: 'cancel' });
+      Alert.alert(t('select_doctor'), '', buttons);
+    } else {
+      const names = doctorsList.map((d, i) => `${i + 1}. ${d.name} (${d.specialization || t('role_doctor')})`).join('\n');
+      Alert.alert(t('select_doctor'), names + '\n\n' + t('change_doctor'), [
+        { text: doctorsList[0].name, onPress: () => { setMyDoc(doctorsList[0]); setMyDoctor(doctorsList[0]); } },
+        { text: doctorsList[1].name, onPress: () => { setMyDoc(doctorsList[1]); setMyDoctor(doctorsList[1]); } },
+        { text: t('cancel'), style: 'cancel' },
+      ]);
+    }
   }
 
   const greeting = () => {
@@ -287,6 +313,29 @@ export default function HomeScreen() {
               </View>
             </View>
 
+            {/* ── My Doctor (patients only) ── */}
+            {user.role !== 'doctor' && (
+              <TouchableOpacity style={styles.doctorAssignCard} onPress={handleSelectDoctor} activeOpacity={0.7}>
+                <View style={styles.doctorAssignLeft}>
+                  <View style={styles.doctorAssignIcon}>
+                    <MaterialCommunityIcons name={myDoctor ? 'stethoscope' : 'plus'} size={22} color={myDoctor ? COLORS.blue[800] : COLORS.outline} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.doctorAssignLabel}>{t('my_doctor')}</Text>
+                    {myDoctor ? (
+                      <>
+                        <Text style={styles.doctorAssignName}>{myDoctor.name}</Text>
+                        <Text style={styles.doctorAssignSpec}>{myDoctor.specialization || t('role_doctor')}</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.doctorAssignEmpty}>{t('no_doctor_assigned')} — {t('select_doctor')}</Text>
+                    )}
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.outline} />
+              </TouchableOpacity>
+            )}
+
             {/* ── Medication List ── */}
             <View style={[styles.bentoCard, { marginBottom: 100 }]}>
               <View style={styles.nextHeader}>
@@ -399,6 +448,18 @@ const styles = StyleSheet.create({
     flex: 0.7, alignItems: 'flex-start',
   },
   doctorTip:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSecondaryFixedVariant, lineHeight: 16, marginTop: 4 },
+
+  /* ── Doctor Assign Card ── */
+  doctorAssignCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.blue[50], borderRadius: RADIUS.xl, padding: 14, marginBottom: CARD_GAP,
+  },
+  doctorAssignLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  doctorAssignIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  doctorAssignLabel: { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.blue[800], textTransform: 'uppercase', letterSpacing: 0.3 },
+  doctorAssignName: { fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface, marginTop: 1 },
+  doctorAssignSpec: { fontSize: 11, fontFamily: FONT.body, color: COLORS.blue[800], opacity: 0.7, marginTop: 1 },
+  doctorAssignEmpty: { fontSize: 12, fontFamily: FONT.body, color: COLORS.blue[800], opacity: 0.6, marginTop: 2 },
 
   /* ── Medication List ── */
   medRow: {

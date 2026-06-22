@@ -129,6 +129,50 @@ const LANG = {
   source_manual:           { sw: 'Mkono', en: 'Manual' },
   source_doctor:           { sw: 'Daktari', en: 'Doctor' },
 
+  // ── Prescription Form Enhancements ──────────────────────────
+  freq_once:               { sw: 'Mara moja kwa siku', en: 'Once daily' },
+  freq_twice:              { sw: 'Mara mbili kwa siku', en: 'Twice daily' },
+  freq_thrice:             { sw: 'Mara tatu kwa siku', en: 'Thrice daily' },
+  time_morning:            { sw: 'Asubuhi', en: 'Morning' },
+  time_afternoon:          { sw: 'Mchana', en: 'Afternoon' },
+  time_evening:            { sw: 'Jioni', en: 'Evening' },
+  time_night:              { sw: 'Usiku', en: 'Night' },
+  select_times:            { sw: 'Chagua nyakati', en: 'Select times' },
+  frequency_presets:       { sw: 'Mara kwa siku', en: 'Per day' },
+  time_preset_hint:        { sw: 'Bonyeza kuweka saa', en: 'Tap to set time' },
+  no_times_selected:       { sw: 'Chagua angalau wakati mmoja', en: 'Select at least one time' },
+
+  // ── Special Conditions ──────────────────────────────────────
+  condition_diabetes:      { sw: 'Kisukari', en: 'Diabetes' },
+  condition_bp:            { sw: 'Shinikizo la damu', en: 'Blood Pressure' },
+  condition_hiv:           { sw: 'VVU', en: 'HIV' },
+  auto_added_title:        { sw: 'Dawa zimeongezwa', en: 'Meds added' },
+  auto_added_body:         { sw: 'Dawa za {condition} zimeongezwa kiotomatiki. Unaweza kuzibadilisha.', en: '{condition} medications have been auto-added. You can edit them anytime.' },
+  auto_diabetes_rx:        { sw: 'Insulin baada ya kila mlo', en: 'Insulin after each meal' },
+  auto_bp_rx:              { sw: 'Dawa ya shinikizo la damu', en: 'Blood pressure medication' },
+  auto_hiv_rx:             { sw: 'Tiba ya VVU (ART)', en: 'HIV treatment (ART)' },
+
+  // ── Doctor Screen ───────────────────────────────────────────
+  header_doctor:           { sw: 'Daktari', en: 'Doctor' },
+  doctor_dashboard:        { sw: 'Dashibodi ya Daktari', en: 'Doctor Dashboard' },
+  label_patients:          { sw: 'Wagonjwa', en: 'Patients' },
+  patient_adherence:       { sw: 'Uzingativu', en: 'Adherence' },
+  patient_streak:          { sw: 'Msururu', en: 'Streak' },
+  btn_issue_prescription:  { sw: 'Toa dawa', en: 'Issue Prescription' },
+  no_patients:             { sw: 'Hakuna wagonjwa waliotengwa.', en: 'No patients assigned yet.' },
+  patient_since:           { sw: 'Tangu', en: 'Patient since' },
+  select_patient:          { sw: 'Chagua mgonjwa', en: 'Select patient' },
+  doctor_notes:            { sw: 'Maelezo ya daktari', en: 'Doctor notes' },
+  rx_issued:               { sw: 'Dawa imetolewa kwa mgonjwa.', en: 'Prescription issued to patient.' },
+  no_condition_match:      { sw: 'Hali ya kiafya haijatambuliwa kwa dawa za kiotomatiki.', en: 'Condition not recognized for auto-prescriptions.' },
+
+  // ── Voice Notifications ──────────────────────────────────────
+  voice_label:             { sw: 'Sauti', en: 'Voice' },
+  voice_notif_enabled:     { sw: 'Arifa za sauti zimewashwa', en: 'Voice notifications on' },
+  voice_notif_disabled:    { sw: 'Arifa za sauti zimezimwa', en: 'Voice notifications off' },
+  notif_time:              { sw: 'Wakati wa kuchukua dawa', en: 'Time to take medication' },
+  notif_voice_body:        { sw: 'Ni wakati wa kuchukua {drug}', en: 'Time to take {drug}' },
+
   // ── Reminders Screen ─────────────────────────────────────────
   header_reminders:        { sw: 'Vikumbusho', en: 'Reminders' },
   status_taken:            { sw: 'Imechukuliwa', en: 'Taken' },
@@ -171,6 +215,24 @@ const LANG = {
   permission_desc:         { sw: 'Ruhusu ufikiaji wa picha ili kubadilisha picha yako.', en: 'Allow access to photos to change your profile picture.' },
   error_name_required:     { sw: 'Jina linahitajika.', en: 'Name is required.' },
   saved_profile:           { sw: 'Wasifu umehifadhiwa kwa mafanikio.', en: 'Profile updated successfully.' },
+
+  // ── Role Management ─────────────────────────────────────────
+  role_patient:            { sw: 'Mgonjwa', en: 'Patient' },
+  role_doctor:             { sw: 'Daktari', en: 'Doctor' },
+  label_role:              { sw: 'Weka kama', en: 'Register as' },
+  label_specialization:    { sw: 'Utaalamu', en: 'Specialization' },
+  placeholder_specialization: { sw: 'Mf. Daktari Mkuu', en: 'e.g. General Practitioner' },
+  login_as:                { sw: 'Ingia kama', en: 'Login as' },
+  switch_role_doctor:      { sw: 'Badilisha kwa Daktari', en: 'Switch to Doctor' },
+  switch_role_patient:     { sw: 'Badilisha kwa Mgonjwa', en: 'Switch to Patient' },
+  my_doctor:               { sw: 'Daktari wangu', en: 'My Doctor' },
+  select_doctor:           { sw: 'Chagua daktari', en: 'Select Doctor' },
+  assigned_doctor:         { sw: 'Daktari aliyetengwa', en: 'Assigned Doctor' },
+  no_doctor_assigned:      { sw: 'Hajateuliwa', en: 'Not assigned' },
+  no_doctors_available:    { sw: 'Hakuna madaktari waliosajiliwa.', en: 'No doctors registered yet.' },
+  doctor_register_title:   { sw: 'Usajili wa Daktari', en: 'Doctor Registration' },
+  doctor_register_subtitle:{ sw: 'Jaza taarifa zako za kitaalamu.', en: 'Fill in your professional information.' },
+  change_doctor:           { sw: 'Badilisha daktari', en: 'Change Doctor' },
 };
 
 export default LANG;

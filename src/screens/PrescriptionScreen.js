@@ -15,7 +15,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
 
 const INITIAL_FORM = {
-  drugName: '', dosage: '', frequency: '', times: ['08:00'], notes: '', source: 'manual',
+  drugName: '', dosage: '', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
 };
 
 function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
@@ -75,6 +75,7 @@ export default function PrescriptionScreen() {
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
 
@@ -214,9 +215,62 @@ export default function PrescriptionScreen() {
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <FormInput label={t('label_drug_name')} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder={t('placeholder_drug_name')} />
             <FormInput label={t('label_dosage')} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder={t('placeholder_dosage')} />
-            <FormInput label={t('label_frequency')} value={form.frequency} onChangeText={v => setForm(f => ({ ...f, frequency: v }))} placeholder={t('placeholder_frequency')} />
-            <FormInput label={`${t('label_times')} — ${t('times_instruction')}`} value={form.times.join(', ')} onChangeText={v => setForm(f => ({ ...f, times: v.split(',').map(t => normalizeTime(t.trim())) }))} placeholder={t('placeholder_times')} />
+
+            {/* Frequency Presets */}
+            <Text style={styles.inputLabel}>{t('frequency_presets')}</Text>
+            <View style={styles.freqRow}>
+              {[
+                { key: 'once', label: t('freq_once'), times: ['08:00'] },
+                { key: 'twice', label: t('freq_twice'), times: ['08:00', '20:00'] },
+                { key: 'thrice', label: t('freq_thrice'), times: ['08:00', '14:00', '20:00'] },
+              ].map(opt => {
+                const active = form.times.length === opt.times.length &&
+                  form.times.every((t, i) => t === opt.times[i]);
+                return (
+                  <TouchableOpacity key={opt.key} style={[styles.freqBtn, active && styles.freqBtnActive]} onPress={() => setForm(f => ({ ...f, times: [...opt.times], frequency: opt.label }))}>
+                    <Text style={[styles.freqBtnText, active && styles.freqBtnTextActive]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Time Period Pills */}
+            <Text style={styles.inputLabel}>{t('select_times')}</Text>
+            <View style={styles.timePillRow}>
+              {[
+                { key: 'asubuhi', label: t('time_morning'), icon: 'weather-sunset-up', time: '08:00' },
+                { key: 'mchana', label: t('time_afternoon'), icon: 'weather-sunny', time: '14:00' },
+                { key: 'jioni', label: t('time_evening'), icon: 'weather-sunset-down', time: '20:00' },
+                { key: 'usiku', label: t('time_night'), icon: 'weather-night', time: '22:00' },
+              ].map(period => {
+                const hasTime = form.times.includes(period.time);
+                return (
+                  <TouchableOpacity key={period.key} style={[styles.timePill, hasTime && styles.timePillActive]} onPress={() => {
+                    if (hasTime) {
+                      setForm(f => ({ ...f, times: f.times.filter(t => t !== period.time) }));
+                    } else {
+                      setForm(f => ({ ...f, times: [...f.times, period.time].sort() }));
+                    }
+                  }}>
+                    <MaterialCommunityIcons name={period.icon} size={16} color={hasTime ? '#fff' : COLORS.outline} />
+                    <Text style={[styles.timePillLabel, hasTime && styles.timePillLabelActive]}>{period.label}</Text>
+                    <Text style={[styles.timePillVal, hasTime && styles.timePillValActive]}>{period.time}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <FormInput label={t('label_notes')} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('placeholder_notes')} multiline />
+
+            {/* Voice Notification Toggle */}
+            <View style={styles.voiceRow}>
+              <MaterialCommunityIcons name={form.voiceNotif ? 'volume-high' : 'volume-off'} size={20} color={form.voiceNotif ? COLORS.primary : COLORS.outline} />
+              <Text style={styles.voiceLabel}>{t('voice_label')}</Text>
+              <TouchableOpacity style={[styles.voiceToggle, form.voiceNotif && styles.voiceToggleActive]} onPress={() => setForm(f => ({ ...f, voiceNotif: !f.voiceNotif }))}>
+                <View style={[styles.voiceKnob, form.voiceNotif && styles.voiceKnobActive]} />
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.sourceRow}>
               <Text style={styles.inputLabel}>{t('label_source')}</Text>
               <View style={styles.sourceToggle}>
@@ -300,4 +354,28 @@ const styles = StyleSheet.create({
   sourceOptActive:{ backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   sourceOptText:  { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant },
   sourceOptTextActive: { color: '#fff' },
+
+  /* Frequency Presets */
+  freqRow:        { flexDirection: 'row', gap: 8 },
+  freqBtn:        { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, alignItems: 'center', borderWidth: 1, borderColor: COLORS.surfaceHigh },
+  freqBtnActive:  { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  freqBtnText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, textAlign: 'center' },
+  freqBtnTextActive: { color: '#fff' },
+
+  /* Time Period Pills */
+  timePillRow:    { flexDirection: 'row', gap: 8 },
+  timePill:       { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: COLORS.surfaceHigh },
+  timePillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  timePillLabel:  { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
+  timePillLabelActive: { color: '#fff' },
+  timePillVal:    { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant },
+  timePillValActive: { color: '#fff', opacity: 0.85 },
+
+  /* Voice Toggle */
+  voiceRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  voiceLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, flex: 1 },
+  voiceToggle:    { width: 44, height: 24, borderRadius: 12, backgroundColor: COLORS.surfaceHigh, justifyContent: 'center', paddingHorizontal: 2 },
+  voiceToggleActive: { backgroundColor: COLORS.primary },
+  voiceKnob:      { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
+  voiceKnobActive:{ alignSelf: 'flex-end' },
 });

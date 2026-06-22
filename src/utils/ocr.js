@@ -96,6 +96,33 @@ export function parseOCRText(rawText) {
     drugName = match ? match[1] : '';
   }
 
+  // ── "10ml * 3" pattern ─────────────────────────────────────────────
+  // e.g. "Amoxicillin 10ml * 3" → dosage: "10ml", frequency: thrice daily
+  const starPattern = rawText.match(/(\d+\.?\d*\s*(?:ml|mg|mcg|g|iu))\s*\*\s*(\d)/i);
+  if (starPattern) {
+    const starDosage = starPattern[1].trim();
+    const starCount = parseInt(starPattern[2], 10);
+    const freqMap = { 1: 'Once daily', 2: 'Twice daily', 3: 'Thrice daily', 4: 'Four times daily' };
+    const timeMap = {
+      1: ['08:00'], 2: ['08:00', '20:00'], 3: ['08:00', '14:00', '20:00'], 4: ['07:00', '12:00', '17:00', '21:00'],
+    };
+
+    // If no drug name was found, try to extract from before the pattern
+    if (!drugName) {
+      const beforeStar = rawText.slice(0, rawText.indexOf(starPattern[0]));
+      const nameMatch = beforeStar.match(/\b([A-Za-z]{3,})\b/);
+      if (nameMatch) drugName = nameMatch[1];
+    }
+
+    return {
+      drugName,
+      dosage: starDosage,
+      frequency: freqMap[starCount] || `${starCount} times daily`,
+      times: timeMap[starCount] || ['08:00'],
+      rawText,
+    };
+  }
+
   // ── Dosage ────────────────────────────────────────────────────────
   const dosageMatch = rawText.match(/(\d+\.?\d*\s*(?:mg|mcg|g|ml|iu|units?))/i);
   const dosage = dosageMatch ? dosageMatch[1].trim() : '';

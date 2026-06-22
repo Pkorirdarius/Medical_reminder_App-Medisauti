@@ -28,6 +28,8 @@ const KEYS = {
   USER:          'medisauti:user',
   PRESCRIPTIONS: 'medisauti:prescriptions',
   ADHERENCE:     'medisauti:adherence_logs',
+  DOCTORS:       'medisauti:doctors',
+  MY_DOCTOR:     'medisauti:my_doctor',
 };
 
 async function setItemEncrypted(key, value) {
@@ -188,6 +190,73 @@ export async function getMissedDosePatterns(days = 30) {
   }
 
   return patterns;
+}
+
+const CONDITION_PRESETS = {
+  diabetes: [
+    { drugName: 'Metformin', dosage: '500mg', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
+  ],
+  bp: [
+    { drugName: 'Amlodipine', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
+  ],
+  hiv: [
+    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala', source: 'system', voiceNotif: true },
+  ],
+};
+
+// ── Doctor / Role Management ──────────────────────────────────────────
+export async function getDoctors() {
+  const data = await getItemDecrypted(KEYS.DOCTORS);
+  return data || [];
+}
+
+export async function saveDoctorProfile(doctor) {
+  const list = await getDoctors();
+  const idx = list.findIndex(d => d.phone === doctor.phone);
+  if (idx >= 0) {
+    list[idx] = { ...doctor, updatedAt: new Date().toISOString() };
+  } else {
+    list.push({ ...doctor, id: Date.now().toString(), createdAt: new Date().toISOString() });
+  }
+  await setItemEncrypted(KEYS.DOCTORS, list);
+}
+
+export async function getMyDoctor() {
+  return getItemDecrypted(KEYS.MY_DOCTOR);
+}
+
+export async function setMyDoctor(doctor) {
+  if (doctor) {
+    await setItemEncrypted(KEYS.MY_DOCTOR, doctor);
+  } else {
+    await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
+  }
+}
+
+export async function addConditionPrescriptions(condition) {
+  const c = condition.toLowerCase();
+  let presets = [];
+  if (c.includes('kisukari') || c.includes('diabetes')) presets = CONDITION_PRESETS.diabetes;
+  else if (c.includes('shinikizo') || c.includes('blood pressure') || c.includes('bp') || c.includes('damu')) presets = CONDITION_PRESETS.bp;
+  else if (c.includes('hiv') || c.includes('vvu')) presets = CONDITION_PRESETS.hiv;
+
+  if (presets.length === 0) return [];
+
+  const existing = await getPrescriptions();
+  const created = [];
+  for (const preset of presets) {
+    const rx = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
+      ...preset,
+      createdAt: new Date().toISOString(),
+      active: true,
+      notifIds: [],
+    };
+    existing.push(rx);
+    created.push(rx);
+  }
+  await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
+  return created;
 }
 
 export async function getAdherenceTrend(days = 30) {
