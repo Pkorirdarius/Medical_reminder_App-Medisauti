@@ -153,7 +153,7 @@ export default function HomeScreen() {
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
-            <MaterialCommunityIcons name={HC.highContrast ? 'brightness-6' : 'brightness-6'} size={20} color={COLORS.onSurface} />
+            <MaterialCommunityIcons name={highContrast ? 'brightness-6' : 'brightness-6'} size={20} color={COLORS.onSurface} />
           </TouchableOpacity>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
