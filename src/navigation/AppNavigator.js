@@ -9,15 +9,27 @@ import { COLORS, RADIUS, FONT } from '../utils/constants';
 import LandingScreen from '../screens/LandingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
+import ScanScreen from '../screens/ScanScreen';
 import PrescriptionScreen from '../screens/PrescriptionScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ReportScreen from '../screens/ReportScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+function ScanStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ScanHome" component={ScanScreen} />
+      <Stack.Screen name="PrescriptionForm" component={PrescriptionScreen} />
+    </Stack.Navigator>
+  );
+}
+
 const TABS = [
   { name: 'Nyumbani',   label: 'Home',        icon: 'view-dashboard-outline',    iconActive: 'view-dashboard',       Component: HomeScreen },
+  { name: 'Scan',       label: 'Scan',        icon: 'camera-enhance-outline',    iconActive: 'camera-enhance',       Component: ScanStack },
   { name: 'Dawa',       label: 'Meds',        icon: 'pill',                      iconActive: 'pill',                 Component: PrescriptionScreen },
   { name: 'Vikumbusho', label: 'Reminders',   icon: 'bell-ring-outline',         iconActive: 'bell-ring',            Component: RemindersScreen },
   { name: 'Ripoti',     label: 'Reports',     icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: ReportScreen },
@@ -25,18 +37,17 @@ const TABS = [
 
 function TabIcon({ icon, iconActive, focused, label }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 1 }}>
       <MaterialCommunityIcons
         name={focused ? iconActive : icon}
-        size={26}
+        size={24}
         color={focused ? COLORS.primary : COLORS.outline}
       />
       <Text style={{
-        fontSize: 10,
+        fontSize: 9,
         fontFamily: FONT.body,
-        fontWeight: '500',
         color: focused ? COLORS.primary : COLORS.outline,
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
       }}>
         {label}
       </Text>
@@ -52,11 +63,10 @@ function MainTabs() {
         tabBarStyle: {
           backgroundColor: 'rgba(255,255,255,0.85)',
           borderTopWidth: 0,
-          height: 72,
-          paddingTop: 8,
-          paddingBottom: 10,
-          paddingHorizontal: 8,
-          backdropFilter: 'blur(20px)',
+          height: 66,
+          paddingTop: 6,
+          paddingBottom: 6,
+          paddingHorizontal: 4,
           elevation: 0,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: -2 },
@@ -112,7 +122,10 @@ export default function AppNavigator() {
             </Stack.Screen>
           </>
         ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+          </>
         )}
       </Stack.Navigator>
     </HighContrastProvider>

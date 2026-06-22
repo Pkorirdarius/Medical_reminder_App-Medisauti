@@ -4,11 +4,11 @@ import {
   Alert, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { COLORS, RADIUS, FONT } from '../utils/constants';
-import { getPrescriptions, logDose } from '../utils/storage';
+import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
@@ -100,9 +100,11 @@ function ReminderCard({ item, doseStatus, onAction, language }) {
 
 export default function RemindersScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
   const scrollRef = useRef(null);
 
+  const [user, setUser] = useState({ name: 'User' });
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,7 +118,8 @@ export default function RemindersScreen() {
 
   async function loadData() {
     try {
-      const meds = await getPrescriptions();
+      const [meds, u] = await Promise.all([getPrescriptions(), getUser()]);
+      if (u) setUser(u);
       const list = buildReminders(meds);
       setReminders(list);
     } catch (e) { console.error(e); }
@@ -160,6 +163,9 @@ export default function RemindersScreen() {
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
             <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
+            <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -234,6 +240,8 @@ const styles = StyleSheet.create({
   headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
   langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
+  avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary + '20' },
+  avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
   scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
 

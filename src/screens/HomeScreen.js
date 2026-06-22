@@ -4,7 +4,7 @@ import {
   ActivityIndicator, Animated, RefreshControl, Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
@@ -64,6 +64,7 @@ function MedItem({ med }) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { highContrast, toggleHighContrast } = useHighContrast();
   const scrollRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -155,9 +156,9 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
             <MaterialCommunityIcons name={highContrast ? 'brightness-6' : 'brightness-6'} size={20} color={COLORS.onSurface} />
           </TouchableOpacity>
-          <View style={styles.avatar}>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
