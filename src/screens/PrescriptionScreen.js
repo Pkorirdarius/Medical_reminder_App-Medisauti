@@ -40,32 +40,34 @@ function FormInput({ label, value, onChangeText, placeholder, keyboardType, mult
   );
 }
 
-function PrescriptionCard({ item, onDelete }) {
+function PrescriptionCard({ item, onDelete, onEdit }) {
   const { t } = useLanguage();
   return (
-    <View style={styles.medCard}>
-      <View style={styles.medCardHeader}>
-        <View style={styles.medCardLeft}>
-          <View style={styles.medIconWrap}>
-            <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
-            <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
-          </View>
-          {item.source === 'doctor' && (
-            <View style={styles.docBadge}>
-              <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
-              <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
+    <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
+      <View style={styles.medCard}>
+        <View style={styles.medCardHeader}>
+          <View style={styles.medCardLeft}>
+            <View style={styles.medIconWrap}>
+              <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
             </View>
-          )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
+              <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
+            </View>
+            {item.source === 'doctor' && (
+              <View style={styles.docBadge}>
+                <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
+                <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
+            <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
-          <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
-        </TouchableOpacity>
+        {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
       </View>
-      {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -81,13 +83,16 @@ export default function PrescriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrMode, setOcrMode] = useState(null); // 'ai' | 'regex' | null
+  const [ocrMode, setOcrMode] = useState(null);
   const webviewRef = useRef(null);
   const pendingImageUri = useRef(null);
+
+  const isEditing = editItem !== null;
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -105,7 +110,21 @@ export default function PrescriptionScreen() {
 
   function onRefresh() { setRefreshing(true); loadData(); }
 
-  function resetForm() { setForm(INITIAL_FORM); setShowForm(false); }
+  function resetForm() { setForm(INITIAL_FORM); setEditItem(null); setShowForm(false); }
+
+  function openEdit(item) {
+    setEditItem(item);
+    setForm({
+      drugName: item.drugName || '',
+      dosage: item.dosage || '',
+      frequency: item.frequency || INITIAL_FORM.frequency,
+      times: item.times || INITIAL_FORM.times,
+      notes: item.notes || '',
+      source: item.source || 'manual',
+      voiceNotif: item.voiceNotif !== false,
+    });
+    setShowForm(true);
+  }
 
   async function handleOCRSnap() {
     const { status } = await Camera.requestCameraPermissionsAsync();
@@ -207,23 +226,27 @@ export default function PrescriptionScreen() {
     setSaving(true);
     try {
       const prescription = {
-        id: Date.now().toString(),
+        id: isEditing ? editItem.id : Date.now().toString(),
         ...form,
         times: form.times.map(t => normalizeTime(t.trim())),
-        createdAt: new Date().toISOString(),
-        active: true,
-        notifIds: [],
+        createdAt: editItem?.createdAt || new Date().toISOString(),
+        active: editItem?.active !== undefined ? editItem.active : true,
+        notifIds: editItem?.notifIds || [],
       };
-      const notifIds = [];
-      for (const time of prescription.times) {
-        try {
-          const nid = await scheduleReminder(prescription, time, language);
-          notifIds.push({ time, nid });
-        } catch (e) {
-          console.warn('Could not schedule notification for', time, e);
+
+      if (!isEditing) {
+        const notifIds = [];
+        for (const time of prescription.times) {
+          try {
+            const nid = await scheduleReminder(prescription, time, language);
+            notifIds.push({ time, nid });
+          } catch (e) {
+            console.warn('Could not schedule notification for', time, e);
+          }
         }
+        prescription.notifIds = notifIds;
       }
-      prescription.notifIds = notifIds;
+
       await savePrescription(prescription);
       await loadData();
       resetForm();
@@ -304,7 +327,7 @@ export default function PrescriptionScreen() {
               </View>
             ) : (
               prescriptions.map((item, i) => (
-                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} />
+                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} />
               ))
             )}
           </>
@@ -321,7 +344,7 @@ export default function PrescriptionScreen() {
             <TouchableOpacity onPress={resetForm}>
               <Text style={styles.modalCancel}>{t('cancel')}</Text>
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>{t('modal_new_med')}</Text>
+            <Text style={styles.modalTitle}>{isEditing ? t('modal_edit_med') : t('modal_new_med')}</Text>
             <TouchableOpacity onPress={handleSave} disabled={saving}>
               {saving ? <ActivityIndicator size="small" color={COLORS.primary} /> : <Text style={styles.modalSave}>{t('save')}</Text>}
             </TouchableOpacity>

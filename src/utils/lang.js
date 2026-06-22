@@ -124,6 +124,7 @@ const LANG = {
   empty_medications_title: { sw: 'Hakuna dawa', en: 'No medications' },
   empty_medications_sub:   { sw: 'Bonyeza kitufe cha kuongeza dawa mpya.', en: 'Tap the button above to add your first medication.' },
   modal_new_med:           { sw: 'Dawa mpya', en: 'New medication' },
+  modal_edit_med:          { sw: 'Hariri dawa', en: 'Edit medication' },
   label_drug_name:         { sw: 'Jina la dawa', en: 'Drug name' },
   label_dosage:            { sw: 'Kipimo', en: 'Dosage' },
   label_frequency:         { sw: 'Mara', en: 'Frequency' },

@@ -25,6 +25,18 @@ export function getProvider() {
   return null;
 }
 
+function buildUserPrompt(rawText) {
+  return `Extract medication details from this OCR text: "${rawText}"
+
+Return a JSON object with these fields:
+- drugName: the medication name
+- dosage: strength or amount (e.g. 500mg, 10ml)
+- frequency: how often (e.g. Once daily, Twice daily)
+- times: array of 24h times (HH:MM). Infer from frequency if not explicit: once->["08:00"], twice->["08:00","20:00"], thrice->["08:00","14:00","20:00"]
+
+Return only the JSON object, no other text. If unclear, return {"drugName":"","dosage":"","frequency":"","times":[]}`;
+}
+
 async function parseWithGitHub(rawText) {
   const res = await fetch('https://models.inference.ai.azure.com/chat/completions', {
     method: 'POST',
@@ -35,8 +47,7 @@ async function parseWithGitHub(rawText) {
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Raw OCR text:\n${rawText}` },
+        { role: 'user', content: buildUserPrompt(rawText) },
       ],
       temperature: 0.1,
       max_tokens: 256,
@@ -88,7 +99,6 @@ export async function parseWithAI(rawText) {
   if (!hasProvider()) return null;
 
   try {
-    // GitHub PAT takes priority over Gemini
     if (GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here') {
       return await parseWithGitHub(rawText);
     }
