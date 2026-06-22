@@ -2,6 +2,40 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ENC_KEY = 'medisauti-2024-enc-key!';
 
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+function b64encode(str) {
+  let out = '';
+  for (let i = 0; i < str.length; i += 3) {
+    const a = str.charCodeAt(i) || 0;
+    const b = str.charCodeAt(i + 1) || 0;
+    const c = str.charCodeAt(i + 2) || 0;
+    out += B64[a >> 2];
+    out += B64[((a & 3) << 4) | (b >> 4)];
+    out += B64[((b & 15) << 2) | (c >> 6)];
+    out += B64[c & 63];
+  }
+  const pad = str.length % 3;
+  if (pad === 1) { out = out.slice(0, -2) + '=='; }
+  else if (pad === 2) { out = out.slice(0, -1) + '='; }
+  return out;
+}
+
+function b64decode(str) {
+  str = str.replace(/[^A-Za-z0-9+/=]/g, '');
+  let out = '';
+  for (let i = 0; i < str.length; i += 4) {
+    const a = B64.indexOf(str[i] || '=');
+    const b = B64.indexOf(str[i + 1] || '=');
+    const c = B64.indexOf(str[i + 2] || '=');
+    const d = B64.indexOf(str[i + 3] || '=');
+    out += String.fromCharCode((a << 2) | (b >> 4));
+    if (c !== 64) out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+    if (d !== 64) out += String.fromCharCode(((c & 3) << 6) | d);
+  }
+  return out;
+}
+
 function simpleXOR(text, key) {
   let out = '';
   for (let i = 0; i < text.length; i++) {
@@ -12,12 +46,12 @@ function simpleXOR(text, key) {
 
 function encrypt(text) {
   const xor = simpleXOR(text, ENC_KEY);
-  return btoa(unescape(encodeURIComponent(xor)));
+  return b64encode(unescape(encodeURIComponent(xor)));
 }
 
 function decrypt(ciphertext) {
   try {
-    const xor = decodeURIComponent(escape(atob(ciphertext)));
+    const xor = decodeURIComponent(escape(b64decode(ciphertext)));
     return simpleXOR(xor, ENC_KEY);
   } catch {
     return '';

@@ -7,12 +7,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera } from 'expo-camera';
 
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, savePrescription, deletePrescription, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
+import { OCR_WEBVIEW_HTML, parseOCRText } from '../utils/ocr';
 
 const INITIAL_FORM = {
   drugName: '', dosage: '', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
@@ -78,6 +82,10 @@ export default function PrescriptionScreen() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const webviewRef = useRef(null);
+  const pendingImageUri = useRef(null);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -96,6 +104,77 @@ export default function PrescriptionScreen() {
   function onRefresh() { setRefreshing(true); loadData(); }
 
   function resetForm() { setForm(INITIAL_FORM); setShowForm(false); }
+
+  async function handleOCRSnap() {
+    const { status } = await Camera.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('error'), t('permission_desc'));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      startOCR(result.assets[0].base64);
+    }
+  }
+
+  async function handleOCRPick() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(t('error'), t('permission_desc'));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      startOCR(result.assets[0].base64);
+    }
+  }
+
+  function startOCR(base64) {
+    pendingImageUri.current = `data:image/jpeg;base64,${base64}`;
+    setOcrBusy(true);
+    setOcrProgress(0);
+    setTimeout(() => {
+      webviewRef.current?.postMessage(JSON.stringify({ imageUri: pendingImageUri.current }));
+    }, 500);
+  }
+
+  function handleOCRMessage(event) {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'ready') {
+        if (pendingImageUri.current) {
+          webviewRef.current?.postMessage(JSON.stringify({ imageUri: pendingImageUri.current }));
+        }
+      } else if (msg.type === 'progress') {
+        setOcrProgress(msg.progress);
+      } else if (msg.type === 'result') {
+        setOcrBusy(false);
+        pendingImageUri.current = null;
+        const parsed = parseOCRText(msg.text);
+        setForm(f => ({
+          ...f,
+          drugName: parsed.drugName || f.drugName,
+          dosage: parsed.dosage || f.dosage,
+          frequency: parsed.frequency || f.frequency,
+          times: parsed.times.length > 0 ? parsed.times : f.times,
+          source: 'manual',
+        }));
+        setShowForm(true);
+      } else if (msg.type === 'error') {
+        setOcrBusy(false);
+        pendingImageUri.current = null;
+        Alert.alert(t('error'), msg.message || 'OCR failed');
+      }
+    } catch (e) { console.warn('OCR message error', e); }
+  }
 
   async function handleSave() {
     if (!form.drugName.trim() || !form.dosage.trim()) {
@@ -181,6 +260,18 @@ export default function PrescriptionScreen() {
               <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
               <Text style={styles.addBtnText}>{t('add_medication')}</Text>
             </TouchableOpacity>
+
+            {/* OCR Scan Buttons */}
+            <View style={styles.ocrRow}>
+              <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRSnap} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="camera" size={20} color={COLORS.primary} />
+                <Text style={styles.ocrBtnText}>{t('header_scan')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ocrBtn} onPress={handleOCRPick} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="image" size={20} color={COLORS.primary} />
+                <Text style={styles.ocrBtnText}>{t('recent_scans')}</Text>
+              </TouchableOpacity>
+            </View>
 
             {prescriptions.length === 0 ? (
               <View style={styles.emptyState}>
@@ -287,6 +378,30 @@ export default function PrescriptionScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Hidden WebView for Tesseract.js OCR */}
+      <WebView
+        ref={webviewRef}
+        source={{ html: OCR_WEBVIEW_HTML }}
+        onMessage={handleOCRMessage}
+        style={{ height: 0, width: 0, opacity: 0 }}
+        javaScriptEnabled
+        domStorageEnabled
+      />
+
+      {/* OCR Loading Overlay */}
+      {ocrBusy && (
+        <View style={styles.ocrOverlay}>
+          <View style={styles.ocrCard}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.ocrTitle}>{t('scanning')}</Text>
+            <View style={styles.ocrProgBg}>
+              <View style={[styles.ocrProgFill, { width: `${ocrProgress}%` }]} />
+            </View>
+            <Text style={styles.ocrProgText}>{ocrProgress}%</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -378,4 +493,30 @@ const styles = StyleSheet.create({
   voiceToggleActive: { backgroundColor: COLORS.primary },
   voiceKnob:      { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
   voiceKnobActive:{ alignSelf: 'flex-end' },
+
+  /* OCR Buttons */
+  ocrRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  ocrBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow,
+    borderWidth: 1, borderColor: COLORS.surfaceHigh,
+  },
+  ocrBtnText:     { fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.primary },
+
+  /* OCR Overlay */
+  ocrOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 999,
+  },
+  ocrCard: {
+    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 32,
+    alignItems: 'center', gap: 12, marginHorizontal: 40,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 10,
+  },
+  ocrTitle:       { fontSize: 16, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
+  ocrProgBg:      { height: 6, borderRadius: 3, backgroundColor: COLORS.surfaceHigh, width: '100%', overflow: 'hidden' },
+  ocrProgFill:    { height: 6, borderRadius: 3, backgroundColor: COLORS.primary },
+  ocrProgText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline },
 });
