@@ -202,7 +202,7 @@ export default function HomeScreen() {
             {/* ── Hero ── */}
             <View style={styles.hero}>
               <Text style={styles.greeting}>{greeting()},</Text>
-              <Text style={styles.userName}>{user.name} 👋</Text>
+              <Text style={styles.userName}>{user.name}</Text>
             </View>
 
             {/* ── Adherence Hero Card ── */}

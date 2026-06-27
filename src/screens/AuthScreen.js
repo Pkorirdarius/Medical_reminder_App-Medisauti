@@ -87,7 +87,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       if (result.success) {
         const u = await getUser();
         const role = u?.role || loginRole;
-        Alert.alert('✅ ' + t('success'), t('welcome_back'));
+        Alert.alert(t('success'), t('welcome_back'));
         onAuthSuccess(role);
       }
     } catch (e) { console.error(e); }
@@ -104,7 +104,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       });
       if (result.success) {
         setOptInBio(true);
-        Alert.alert('✅ ' + t('success'), t('bio_enrolled'));
+        Alert.alert(t('success'), t('bio_enrolled'));
       }
     } catch (e) { console.error(e); }
     finally { setBioRegistering(false); }
@@ -163,13 +163,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
       if (role === 'doctor') {
         await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
-        Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
+        Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       } else {
         const added = await addConditionPrescriptions(user.condition);
         if (added.length > 0) {
-          Alert.alert('✅ ' + t('auto_added_title'), t('auto_added_body').replace('{condition}', user.condition));
+          Alert.alert(t('auto_added_title'), t('auto_added_body').replace('{condition}', user.condition));
         } else {
-          Alert.alert('✅ ' + t('registration_success'), t('registration_welcome').replace('{name}', user.name));
+          Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
         }
       }
       onAuthSuccess(role);

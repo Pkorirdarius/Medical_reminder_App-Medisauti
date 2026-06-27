@@ -250,7 +250,7 @@ export default function PrescriptionScreen() {
       await savePrescription(prescription);
       await loadData();
       resetForm();
-      Alert.alert('✅ ' + t('saved_success_title'), t('saved_success'));
+      Alert.alert(t('saved_success_title'), t('saved_success'));
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
   }

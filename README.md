@@ -1,4 +1,4 @@
-# MEDISAUTI 💊
+# MEDISAUTI
 ### A Swahili Voice-Enabled Mobile App for Medication Adherence
 **Kabarak University — Computer Science & IT · Darius Korir Pilakan (CS/M/1149/09/23)**
 

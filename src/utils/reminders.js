@@ -45,7 +45,7 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
       : `Time to take your ${prescription.drugName} ${prescription.dosage}`;
 
   const title =
-    language === 'sw' ? '💊 Dawa yako inakungoja!' : '💊 Medication reminder';
+    language === 'sw' ? 'Dawa - Kikumbusho' : 'Medication Reminder';
 
   const notifId = await Notifications.scheduleNotificationAsync({
     content: {

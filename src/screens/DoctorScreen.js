@@ -91,7 +91,7 @@ export default function DoctorScreen() {
         });
       }
       await loadData();
-      Alert.alert('✅ ' + t('auto_added_title'), t('rx_issued'));
+      Alert.alert(t('auto_added_title'), t('rx_issued'));
     } catch (e) { Alert.alert(t('error'), e.message); }
   }
 
