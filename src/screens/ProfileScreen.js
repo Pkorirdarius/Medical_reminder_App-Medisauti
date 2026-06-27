@@ -27,7 +27,7 @@ export default function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   useFocusEffect(useCallback(() => {
     loadProfile();
@@ -312,4 +312,3 @@ function getStyles(C) {
   });
 }
 
-const styles = useMemo(() => getStyles(COLORS), [COLORS]);

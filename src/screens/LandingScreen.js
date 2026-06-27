@@ -12,6 +12,7 @@ export default function LandingScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { language, setLanguage, t } = useLanguage();
   const { COLORS } = useTheme();
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   return (
     <ScrollView
@@ -76,8 +77,6 @@ export default function LandingScreen({ navigation }) {
     </ScrollView>
   );
 }
-
-const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
 function getStyles(C) {
   return StyleSheet.create({
