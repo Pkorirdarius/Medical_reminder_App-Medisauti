@@ -254,6 +254,47 @@ const LANG = {
   doctor_register_title:   { sw: 'Usajili wa Daktari', en: 'Doctor Registration' },
   doctor_register_subtitle:{ sw: 'Jaza taarifa zako za kitaalamu.', en: 'Fill in your professional information.' },
   change_doctor:           { sw: 'Badilisha daktari', en: 'Change Doctor' },
+
+  // ── Dark Mode ────────────────────────────────────────────────
+  dark_mode:               { sw: 'Hali ya giza', en: 'Dark mode' },
+  light_mode:              { sw: 'Hali ya mwanga', en: 'Light mode' },
+
+  // ── Duration ─────────────────────────────────────────────────
+  label_duration:          { sw: 'Muda wa matumizi', en: 'Duration' },
+  placeholder_duration:    { sw: 'Mf. 7', en: 'e.g. 7' },
+  duration_days:           { sw: 'Siku', en: 'Days' },
+  duration_weeks:          { sw: 'Wiki', en: 'Weeks' },
+  duration_months:         { sw: 'Miezi', en: 'Months' },
+
+  // ── Prescription Schedule Screen ─────────────────────────────
+  header_schedule:         { sw: 'Ratiba ya Dawa', en: 'Prescription Schedule' },
+  schedule_title:          { sw: 'Toa Dawa kwa Mgonjwa', en: 'Issue Prescription to Patient' },
+  schedule_sub:            { sw: 'Jaza maelezo ya dawa na muda wa matumizi.', en: 'Fill in medication details and duration.' },
+  schedule_sent:           { sw: 'Dawa imetolewa kwa ratiba.', en: 'Prescription scheduled successfully.' },
+  schedule_duration_label: { sw: 'Muda wa matumizi', en: 'Course Duration' },
+  schedule_start_label:    { sw: 'Tarehe ya kuanza', en: 'Start Date' },
+  schedule_end_label:      { sw: 'Tarehe ya kuisha', en: 'End Date' },
+  schedule_from_today:     { sw: 'Anza leo', en: 'Start today' },
+  schedule_specific_date:  { sw: 'Weka tarehe', en: 'Set specific date' },
+  schedule_notes_doctor:   { sw: 'Maelezo ya daktari', en: "Doctor's notes" },
+  schedule_btn_issue:      { sw: 'Toa Dawa kwa Ratiba', en: 'Issue Scheduled Prescription' },
+  schedule_no_patient:     { sw: 'Hakuna mgonjwa aliyeingia. Ingia kama daktari kwanza.', en: 'No patient logged in. Login as doctor first.' },
+  schedule_issue_another:  { sw: 'Toa nyingine', en: 'Issue Another' },
+
+  // ── Enhanced Streak ──────────────────────────────────────────
+  current_streak:          { sw: 'Msururu wa sasa', en: 'Current Streak' },
+  best_streak:             { sw: 'Msururu bora', en: 'Best Streak' },
+  days_streak:             { sw: 'siku mfululizo', en: 'days streak' },
+  streak_empty:            { sw: 'Bado hakuna msururu. Anza kuchukua dawa zako kwa usawa.', en: 'No streak yet. Start taking your meds consistently.' },
+  streak_ongoing:          { sw: 'Unaendelea vizuri!', en: 'Keep it up!' },
+  streak_lost:             { sw: 'Msururu umekatika. Anza upya!', en: 'Streak broken. Start again!' },
+
+  // ── Medication Analytics ─────────────────────────────────────
+  medication_analytics:    { sw: 'Uchambuzi wa Dawa', en: 'Medication Analytics' },
+  adherence_rate:          { sw: 'Kiwango cha ufuataji', en: 'Adherence Rate' },
+  total_doses:             { sw: 'Jumla ya dozi', en: 'Total Doses' },
+  doses_remaining:         { sw: 'Zimesalia', en: 'Remaining' },
+  no_data_analytics:       { sw: 'Hakuna data ya kutosha kwa uchambuzi.', en: 'Not enough data for analytics.' },
 };
 
 export default LANG;

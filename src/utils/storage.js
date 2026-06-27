@@ -64,6 +64,7 @@ const KEYS = {
   ADHERENCE:     'medisauti:adherence_logs',
   DOCTORS:       'medisauti:doctors',
   MY_DOCTOR:     'medisauti:my_doctor',
+  SCHEDULES:     'medisauti:schedules',
 };
 
 async function setItemEncrypted(key, value) {
@@ -291,6 +292,63 @@ export async function addConditionPrescriptions(condition) {
   }
   await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
   return created;
+}
+
+export async function getCurrentStreak() {
+  const logs = await getLogs();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let streak = 0;
+  let checking = new Date(today);
+
+  while (true) {
+    const dateStr = checking.toISOString().slice(0, 10);
+    const dayLogs = logs.filter(l => l.loggedAt.startsWith(dateStr));
+    const taken = dayLogs.filter(l => l.status === 'taken').length;
+    if (taken > 0) {
+      streak++;
+      checking.setDate(checking.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+export async function getBestStreak(days = 90) {
+  const logs = await getLogs();
+  const since = new Date();
+  since.setDate(since.getDate() - days);
+  const recent = logs.filter(l => new Date(l.loggedAt) >= since);
+
+  const dayMap = {};
+  for (const log of recent) {
+    const day = log.loggedAt.slice(0, 10);
+    if (log.status === 'taken') dayMap[day] = (dayMap[day] || 0) + 1;
+  }
+
+  let best = 0, current = 0;
+  const sorted = Object.keys(dayMap).sort();
+  for (let i = 0; i < sorted.length; i++) {
+    if (i === 0 || new Date(sorted[i]) - new Date(sorted[i - 1]) <= 86400000) {
+      current++;
+    } else {
+      current = 1;
+    }
+    if (current > best) best = current;
+  }
+  return best;
+}
+
+export async function saveSchedule(schedule) {
+  const schedules = await getSchedules();
+  schedules.push({ ...schedule, id: schedule.id || Date.now().toString() });
+  await setItemEncrypted(KEYS.SCHEDULES, schedules);
+}
+
+export async function getSchedules() {
+  const data = await getItemDecrypted(KEYS.SCHEDULES);
+  return data || [];
 }
 
 export async function getAdherenceTrend(days = 30) {

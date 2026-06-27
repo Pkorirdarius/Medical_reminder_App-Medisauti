@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, RefreshControl, ActivityIndicator,
@@ -7,10 +7,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
 function timeToMinutes(t) {
@@ -42,68 +43,11 @@ function buildReminders(meds) {
   return list;
 }
 
-function ReminderCard({ item, doseStatus, onAction, language }) {
-  const { t } = useLanguage();
-  const status = doseStatus[item.key];
-  const isTaken = status === 'taken';
-  const isSnoozed = status === 'snoozed';
-  const isMissed = status === 'missed';
-
-  return (
-    <View style={[
-      styles.remCard,
-      item.isCurrent && styles.remCardCurrent,
-      item.isPast && !status && styles.remCardPast,
-      (isTaken || isMissed) && { opacity: 0.55 },
-    ]}>
-      <TouchableOpacity style={styles.remCardBody} activeOpacity={0.7}>
-        <View style={styles.remTimeCol}>
-          <Text style={styles.remTime}>{formatTime12(item.time).split(' ')[0]}</Text>
-          <Text style={styles.remAmpm}>{formatTime12(item.time).split(' ')[1]}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.remDrug}>{item.drugName}</Text>
-          <Text style={styles.remPeriod}>{getTimeLabel(item.time, language)}</Text>
-          {item.notes ? <Text style={styles.remNotes}>{item.notes}</Text> : null}
-        </View>
-      </TouchableOpacity>
-
-      <View style={styles.remActions}>
-        {!status ? (
-          <>
-            <TouchableOpacity style={styles.actionTaken} onPress={() => onAction(item.key, 'taken', item)} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="check" size={18} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionSnooze} onPress={() => onAction(item.key, 'snoozed', item)} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.amber[800]} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionMissed} onPress={() => onAction(item.key, 'missed', item)} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="close" size={18} color="#fff" />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <View style={[styles.statusChip, {
-            backgroundColor: isTaken ? COLORS.green[50] : isSnoozed ? COLORS.amber[50] : COLORS.red[50],
-          }]}>
-            <MaterialCommunityIcons
-              name={isTaken ? 'check-circle' : isSnoozed ? 'clock-outline' : 'close-circle'}
-              size={14}
-              color={isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400]}
-            />
-            <Text style={[styles.statusText, { color: isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400] }]}>
-              {isTaken ? t('status_taken') : isSnoozed ? t('status_snoozed') : t('status_missed')}
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
 export default function RemindersScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { COLORS, isDark, toggleTheme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
@@ -112,6 +56,66 @@ export default function RemindersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [doseStatus, setDoseStatus] = useState({});
+
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
+
+  function ReminderCard({ item, doseStatus, onAction, language }) {
+    const { t } = useLanguage();
+    const status = doseStatus[item.key];
+    const isTaken = status === 'taken';
+    const isSnoozed = status === 'snoozed';
+    const isMissed = status === 'missed';
+
+    return (
+      <View style={[
+        styles.remCard,
+        item.isCurrent && styles.remCardCurrent,
+        item.isPast && !status && styles.remCardPast,
+        (isTaken || isMissed) && { opacity: 0.55 },
+      ]}>
+        <TouchableOpacity style={styles.remCardBody} activeOpacity={0.7}>
+          <View style={styles.remTimeCol}>
+            <Text style={styles.remTime}>{formatTime12(item.time).split(' ')[0]}</Text>
+            <Text style={styles.remAmpm}>{formatTime12(item.time).split(' ')[1]}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.remDrug}>{item.drugName}</Text>
+            <Text style={styles.remPeriod}>{getTimeLabel(item.time, language)}</Text>
+            {item.notes ? <Text style={styles.remNotes}>{item.notes}</Text> : null}
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.remActions}>
+          {!status ? (
+            <>
+              <TouchableOpacity style={styles.actionTaken} onPress={() => onAction(item.key, 'taken', item)} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="check" size={18} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionSnooze} onPress={() => onAction(item.key, 'snoozed', item)} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.amber[800]} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionMissed} onPress={() => onAction(item.key, 'missed', item)} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="close" size={18} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={[styles.statusChip, {
+              backgroundColor: isTaken ? COLORS.green[50] : isSnoozed ? COLORS.amber[50] : COLORS.red[50],
+            }]}>
+              <MaterialCommunityIcons
+                name={isTaken ? 'check-circle' : isSnoozed ? 'clock-outline' : 'close-circle'}
+                size={14}
+                color={isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400]}
+              />
+              <Text style={[styles.statusText, { color: isTaken ? COLORS.green[400] : isSnoozed ? COLORS.amber[400] : COLORS.red[400] }]}>
+                {isTaken ? t('status_taken') : isSnoozed ? t('status_snoozed') : t('status_missed')}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -160,8 +164,8 @@ export default function RemindersScreen() {
           <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
-            <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+          <TouchableOpacity onPress={toggleTheme} style={styles.iconBtn}>
+            <MaterialCommunityIcons name={isDark ? 'weather-sunny' : 'weather-night'} size={20} color={COLORS.onSurface} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
@@ -225,56 +229,58 @@ export default function RemindersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: COLORS.background,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-    zIndex: 10,
-  },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5 },
-  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
-  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
-  avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary + '20' },
-  avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:         { flex: 1, backgroundColor: C.background },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: C.background,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+      zIndex: 10,
+    },
+    headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5 },
+    headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+    langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: C.onSurface },
+    avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.primary + '20' },
+    avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-  scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
+    scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
 
-  legend:         { flexDirection: 'row', gap: 16, marginBottom: 16 },
-  legendItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendText:     { fontSize: 11, fontFamily: FONT.body },
+    legend:         { flexDirection: 'row', gap: 16, marginBottom: 16 },
+    legendItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    legendText:     { fontSize: 11, fontFamily: FONT.body },
 
-  sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
+    sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10 },
 
-  remCard: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 14,
-    marginBottom: 10, flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
-  },
-  remCardCurrent: { borderLeftWidth: 4, borderLeftColor: COLORS.primary },
-  remCardPast:    { opacity: 0.65 },
-  remCardBody:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  remTimeCol:     { alignItems: 'center' },
-  remTime:        { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, letterSpacing: -0.5 },
-  remAmpm:        { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline, marginTop: -1 },
-  remDrug:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  remPeriod:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 1 },
-  remNotes:       { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 4, fontStyle: 'italic' },
+    remCard: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 14,
+      marginBottom: 10, flexDirection: 'row', alignItems: 'center',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    },
+    remCardCurrent: { borderLeftWidth: 4, borderLeftColor: C.primary },
+    remCardPast:    { opacity: 0.65 },
+    remCardBody:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+    remTimeCol:     { alignItems: 'center' },
+    remTime:        { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface, letterSpacing: -0.5 },
+    remAmpm:        { fontSize: 10, fontFamily: FONT.body, color: C.outline, marginTop: -1 },
+    remDrug:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    remPeriod:      { fontSize: 11, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 1 },
+    remNotes:       { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 4, fontStyle: 'italic' },
 
-  remActions:     { flexDirection: 'row', gap: 6, marginLeft: 8 },
-  actionTaken:    { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.green[400], alignItems: 'center', justifyContent: 'center' },
-  actionSnooze:   { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.amber[50], alignItems: 'center', justifyContent: 'center' },
-  actionMissed:   { width: 34, height: 34, borderRadius: 10, backgroundColor: COLORS.red[400], alignItems: 'center', justifyContent: 'center' },
+    remActions:     { flexDirection: 'row', gap: 6, marginLeft: 8 },
+    actionTaken:    { width: 34, height: 34, borderRadius: 10, backgroundColor: C.green[400], alignItems: 'center', justifyContent: 'center' },
+    actionSnooze:   { width: 34, height: 34, borderRadius: 10, backgroundColor: C.amber[50], alignItems: 'center', justifyContent: 'center' },
+    actionMissed:   { width: 34, height: 34, borderRadius: 10, backgroundColor: C.red[400], alignItems: 'center', justifyContent: 'center' },
 
-  statusChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  statusText:     { fontSize: 11, fontFamily: FONT.bodySemiBold },
+    statusChip:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 6 },
+    statusText:     { fontSize: 11, fontFamily: FONT.bodySemiBold },
 
-  emptyState:     { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginTop: 16 },
-  emptySub:       { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
-  noEarlier:      { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', paddingVertical: 20 },
-});
+    emptyState:     { alignItems: 'center', paddingVertical: 60 },
+    emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface, marginTop: 16 },
+    emptySub:       { fontSize: 13, fontFamily: FONT.body, color: C.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
+    noEarlier:      { fontSize: 13, fontFamily: FONT.body, color: C.outline, textAlign: 'center', paddingVertical: 20 },
+  });
+}

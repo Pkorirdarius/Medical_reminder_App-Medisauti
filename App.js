@@ -15,6 +15,12 @@ import {
 } from '@expo-google-fonts/public-sans';
 import AppNavigator from './src/navigation/AppNavigator';
 import { LanguageProvider } from './src/utils/LanguageContext';
+import { ThemeProvider, useTheme } from './src/utils/ThemeContext';
+
+function StatusBarManager() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} backgroundColor={isDark ? '#0d1117' : '#f9faf5'} />;
+}
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -48,13 +54,15 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <LanguageProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" backgroundColor="#f9faf5" />
-          <AppNavigator />
-        </NavigationContainer>
-      </LanguageProvider>
-    </SafeAreaProvider>
+    <ThemeProvider>
+      <SafeAreaProvider>
+        <LanguageProvider>
+          <NavigationContainer>
+            <StatusBarManager />
+            <AppNavigator />
+          </NavigationContainer>
+        </LanguageProvider>
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }

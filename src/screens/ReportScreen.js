@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, RefreshControl, Share, Alert, Linking,
@@ -9,37 +9,19 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, calcAdherence, getDailyStreak, getPerMedicationAdherence, getMissedDosePatterns, getAdherenceTrend, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const PERIOD_MAP = { morning: 'period_morning', afternoon: 'period_afternoon', evening: 'period_evening', night: 'period_night' };
-
-function ProgressBar({ value, color, height = 6 }) {
-  return (
-    <View style={[styles.progBg, { height }]}>
-      <View style={[styles.progFill, { width: `${Math.min(value, 100)}%`, backgroundColor: color, height }]} />
-    </View>
-  );
-}
-
-function StatRow({ icon, iconColor, value, label }) {
-  return (
-    <View style={styles.statRowItem}>
-      <MaterialCommunityIcons name={icon} size={18} color={iconColor} />
-      <View style={{ marginLeft: 8, flex: 1 }}>
-        <Text style={styles.statRowVal}>{value}</Text>
-        <Text style={styles.statRowLabel}>{label}</Text>
-      </View>
-    </View>
-  );
-}
 
 export default function ReportScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { COLORS, isDark, toggleTheme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
@@ -133,6 +115,28 @@ export default function ReportScreen() {
 
   const maxPattern = Math.max(1, ...Object.values(patterns));
 
+  function ProgressBar({ value, color, height = 6 }) {
+    return (
+      <View style={[styles.progBg, { height }]}>
+        <View style={[styles.progFill, { width: `${Math.min(value, 100)}%`, backgroundColor: color, height }]} />
+      </View>
+    );
+  }
+
+  function StatRow({ icon, iconColor, value, label }) {
+    return (
+      <View style={styles.statRowItem}>
+        <MaterialCommunityIcons name={icon} size={18} color={iconColor} />
+        <View style={{ marginLeft: 8, flex: 1 }}>
+          <Text style={styles.statRowVal}>{value}</Text>
+          <Text style={styles.statRowLabel}>{label}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -144,8 +148,8 @@ export default function ReportScreen() {
           <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
-            <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+          <TouchableOpacity onPress={toggleTheme} style={styles.iconBtn}>
+            <MaterialCommunityIcons name={isDark ? 'weather-sunny' : 'weather-night'} size={20} color={COLORS.onSurface} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
@@ -342,115 +346,117 @@ export default function ReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: COLORS.background,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-    zIndex: 10,
-  },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5 },
-  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
-  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
-  avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary + '20' },
-  avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:         { flex: 1, backgroundColor: C.background },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: C.background,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+      zIndex: 10,
+    },
+    headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5 },
+    headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+    langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: C.onSurface },
+    avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.primary + '20' },
+    avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-  scrollContent:  { padding: 16, flexGrow: 1 },
+    scrollContent:  { padding: 16, flexGrow: 1 },
 
-  sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase' },
-  sectionLabelSub:{ fontSize: 10, fontFamily: FONT.body, color: COLORS.outline, marginTop: 1 },
+    sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase' },
+    sectionLabelSub:{ fontSize: 10, fontFamily: FONT.body, color: C.outline, marginTop: 1 },
 
-  /* ── Hero Report ── */
-  heroReport: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 20,
-    marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  heroReportTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  trendChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  trendText:      { fontSize: 11, fontFamily: FONT.bodySemiBold },
-  heroRate:       { fontSize: 56, fontFamily: FONT.headline, letterSpacing: -2, lineHeight: 62, marginVertical: 8 },
-  heroStats:      { flexDirection: 'row', gap: 24, marginTop: 12 },
+    /* ── Hero Report ── */
+    heroReport: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 20,
+      marginBottom: 12,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    },
+    heroReportTop:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    trendChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+    trendText:      { fontSize: 11, fontFamily: FONT.bodySemiBold },
+    heroRate:       { fontSize: 56, fontFamily: FONT.headline, letterSpacing: -2, lineHeight: 62, marginVertical: 8 },
+    heroStats:      { flexDirection: 'row', gap: 24, marginTop: 12 },
 
-  progBg:         { backgroundColor: COLORS.surfaceHigh, borderRadius: 4, overflow: 'hidden' },
-  progFill:       { borderRadius: 4 },
+    progBg:         { backgroundColor: C.surfaceHigh, borderRadius: 4, overflow: 'hidden' },
+    progFill:       { borderRadius: 4 },
 
-  statRowItem:    { flexDirection: 'row', alignItems: 'center' },
-  statRowVal:     { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface },
-  statRowLabel:   { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline },
+    statRowItem:    { flexDirection: 'row', alignItems: 'center' },
+    statRowVal:     { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface },
+    statRowLabel:   { fontSize: 11, fontFamily: FONT.body, color: C.outline },
 
-  /* ── Action Row ── */
-  actionRow:      { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  exportBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, paddingHorizontal: 16, paddingVertical: 12, flex: 1 },
-  exportBtnText:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: '#fff' },
-  shareWhatsApp:  { width: 44, height: 44, borderRadius: 14, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' },
-  shareEmail:     { width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.blue[50], alignItems: 'center', justifyContent: 'center' },
-  shareMore:      { width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+    /* ── Action Row ── */
+    actionRow:      { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    exportBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primary, borderRadius: RADIUS.xl, paddingHorizontal: 16, paddingVertical: 12, flex: 1 },
+    exportBtnText:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: '#fff' },
+    shareWhatsApp:  { width: 44, height: 44, borderRadius: 14, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' },
+    shareEmail:     { width: 44, height: 44, borderRadius: 14, backgroundColor: C.blue[50], alignItems: 'center', justifyContent: 'center' },
+    shareMore:      { width: 44, height: 44, borderRadius: 14, backgroundColor: C.surfaceLow, alignItems: 'center', justifyContent: 'center' },
 
-  /* ── Bento Card ── */
-  bentoCard: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 18,
-    marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+    /* ── Bento Card ── */
+    bentoCard: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 18,
+      marginBottom: 12,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    },
+    cardHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
 
-  /* ── Trend ── */
-  trendRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  trendDir:       { fontSize: 16, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface, textTransform: 'capitalize' },
-  weekChart:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 100 },
-  weekBarCol:     { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
-  weekBar:        { width: '60%', minHeight: 4 },
-  weekBarVal:     { fontSize: 9, fontFamily: FONT.body, color: COLORS.outline },
-  weekBarLabel:   { fontSize: 9, fontFamily: FONT.body, color: COLORS.outline, marginTop: 4 },
+    /* ── Trend ── */
+    trendRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+    trendDir:       { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface, textTransform: 'capitalize' },
+    weekChart:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 100 },
+    weekBarCol:     { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+    weekBar:        { width: '60%', minHeight: 4 },
+    weekBarVal:     { fontSize: 9, fontFamily: FONT.body, color: C.outline },
+    weekBarLabel:   { fontSize: 9, fontFamily: FONT.body, color: C.outline, marginTop: 4 },
 
-  /* ── Per Medication ── */
-  perMedRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  perMedName:     { width: 100, fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurface },
-  perMedRight:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  perMedRate:     { fontSize: 12, fontFamily: FONT.bodySemiBold, width: 36, textAlign: 'right' },
+    /* ── Per Medication ── */
+    perMedRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+    perMedName:     { width: 100, fontSize: 12, fontFamily: FONT.body, color: C.onSurface },
+    perMedRight:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+    perMedRate:     { fontSize: 12, fontFamily: FONT.bodySemiBold, width: 36, textAlign: 'right' },
 
-  /* ── Patterns ── */
-  patternChart:   { gap: 8 },
-  patternRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  patternLabel:   { width: 70, fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant },
-  patternBarBg:   { flex: 1, height: 10, backgroundColor: COLORS.surfaceHigh, borderRadius: 5 },
-  patternBarFill: { height: 10, borderRadius: 5 },
-  patternVal:     { width: 28, fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.red[400], textAlign: 'right' },
+    /* ── Patterns ── */
+    patternChart:   { gap: 8 },
+    patternRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    patternLabel:   { width: 70, fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant },
+    patternBarBg:   { flex: 1, height: 10, backgroundColor: C.surfaceHigh, borderRadius: 5 },
+    patternBarFill: { height: 10, borderRadius: 5 },
+    patternVal:     { width: 28, fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.red[400], textAlign: 'right' },
 
-  /* ── Streak ── */
-  streakRow:      { flexDirection: 'row', justifyContent: 'space-between' },
-  streakCol:      { alignItems: 'center', gap: 6 },
-  streakDot:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  streakLabel:    { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
+    /* ── Streak ── */
+    streakRow:      { flexDirection: 'row', justifyContent: 'space-between' },
+    streakCol:      { alignItems: 'center', gap: 6 },
+    streakDot:      { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    streakLabel:    { fontSize: 10, fontFamily: FONT.body, color: C.outline },
 
-  /* ── Doctor Callout ── */
-  doctorCallout: {
-    backgroundColor: COLORS.secondaryContainer + '20', borderRadius: RADIUS.xl, padding: 20,
-    marginBottom: 12, overflow: 'hidden', position: 'relative',
-  },
-  doctorBgCircle: {
-    position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60,
-    backgroundColor: COLORS.secondary + '10',
-  },
-  doctorTitle:    { fontSize: 15, fontFamily: FONT.bold, color: COLORS.onSecondaryFixedVariant, marginTop: 8 },
-  doctorSub:      { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSecondaryFixedVariant, lineHeight: 18, marginTop: 4, opacity: 0.8 },
-  doctorBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: COLORS.secondary, borderRadius: RADIUS.xl, paddingHorizontal: 16, paddingVertical: 10, alignSelf: 'flex-start', marginTop: 12 },
+    /* ── Doctor Callout ── */
+    doctorCallout: {
+      backgroundColor: C.secondaryContainer + '20', borderRadius: RADIUS.xl, padding: 20,
+      marginBottom: 12, overflow: 'hidden', position: 'relative',
+    },
+    doctorBgCircle: {
+      position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60,
+      backgroundColor: C.secondary + '10',
+    },
+    doctorTitle:    { fontSize: 15, fontFamily: FONT.bold, color: C.onSecondaryFixedVariant, marginTop: 8 },
+    doctorSub:      { fontSize: 12, fontFamily: FONT.body, color: C.onSecondaryFixedVariant, lineHeight: 18, marginTop: 4, opacity: 0.8 },
+    doctorBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.secondary, borderRadius: RADIUS.xl, paddingHorizontal: 16, paddingVertical: 10, alignSelf: 'flex-start', marginTop: 12 },
 
-  doctorBtnText:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: '#fff' },
+    doctorBtnText:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: '#fff' },
 
-  /* ── History ── */
-  historyRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh },
-  historyTitle:   { fontSize: 13, fontFamily: FONT.bodyMedium, color: COLORS.onSurface },
-  historyDate:    { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 1 },
-  historyRate:    { fontSize: 16, fontFamily: FONT.bold },
+    /* ── History ── */
+    historyRow:     { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
+    historyTitle:   { fontSize: 13, fontFamily: FONT.bodyMedium, color: C.onSurface },
+    historyDate:    { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 1 },
+    historyRate:    { fontSize: 16, fontFamily: FONT.bold },
 
-  /* ── Help ── */
-  helpBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.error, borderRadius: RADIUS.xl, padding: 16, marginTop: 4 },
-  helpTitle:      { fontSize: 15, fontFamily: FONT.bold, color: '#fff' },
-  helpSub:        { fontSize: 11, fontFamily: FONT.body, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-});
+    /* ── Help ── */
+    helpBanner:     { flexDirection: 'row', alignItems: 'center', backgroundColor: C.error, borderRadius: RADIUS.xl, padding: 16, marginTop: 4 },
+    helpTitle:      { fontSize: 15, fontFamily: FONT.bold, color: '#fff' },
+    helpSub:        { fontSize: 11, fontFamily: FONT.body, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView,
@@ -7,9 +7,10 @@ import {
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const PIN_LENGTH = 4;
 
@@ -35,6 +36,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [userBioPref, setUserBioPref] = useState(false);
   const [optInBio, setOptInBio] = useState(false);
   const { language, setLanguage, t } = useLanguage();
+  const { COLORS } = useTheme();
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
   const [registering, setRegistering] = useState(false);
 
   const pulse = useRef(new Animated.Value(1)).current;
@@ -194,6 +197,23 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       }
       onAuthSuccess(user.role || 'patient');
     } catch (e) { Alert.alert('Error', e.message); }
+  }
+
+  function Input({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry }) {
+    return (
+      <View style={styles.inputRow}>
+        <Text style={styles.label}>{label}</Text>
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.outline}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+        />
+      </View>
+    );
   }
 
   if (loading) {
@@ -356,75 +376,60 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   );
 }
 
-function Input({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry }) {
-  return (
-    <View style={styles.inputRow}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.outline}
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-      />
-    </View>
-  );
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:         { flex: 1, backgroundColor: C.primary },
+    header:         { alignItems: 'center', paddingVertical: 30 },
+    appName:        { fontSize: 32, fontFamily: FONT.headline, color: '#fff', letterSpacing: -0.5, marginTop: 8 },
+    tagline:        { fontSize: 13, fontFamily: FONT.body, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
+
+    langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 20, borderRadius: RADIUS.xl, overflow: 'hidden', marginBottom: 8, alignSelf: 'center' },
+    langBtn:        { paddingHorizontal: 24, paddingVertical: 10, alignItems: 'center' },
+    langBtnActive:  { backgroundColor: C.primaryFixed + '40' },
+    langBtnText:    { fontSize: 13, fontFamily: FONT.bodyMedium },
+    langBtnTextActive: { color: C.primary, fontWeight: '700' },
+
+    scrollContent:  { padding: 20, paddingBottom: 120, flexGrow: 1 },
+
+    card: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xxl,
+      padding: 24, marginBottom: 16,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8,
+    },
+    cardTitle:      { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface, marginBottom: 4 },
+    cardSub:        { fontSize: 13, fontFamily: FONT.body, color: C.onSurfaceVariant, marginBottom: 20, lineHeight: 18 },
+
+    /* Role Toggle */
+    roleRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+    roleLabel:      { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant },
+    roleToggle:     { flexDirection: 'row', gap: 6 },
+    roleOpt:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh },
+    roleOptActive:  { backgroundColor: C.primary, borderColor: C.primary },
+    roleOptText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.outline },
+    roleOptTextActive: { color: '#fff' },
+
+    inputRow:       { marginBottom: 14 },
+    label:          { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, marginBottom: 4 },
+    input:          { backgroundColor: C.surfaceLow, borderRadius: RADIUS.md, padding: 12, fontSize: 15, fontFamily: FONT.body, color: C.onSurface, borderWidth: 1, borderColor: C.surfaceHigh },
+
+    primaryBtn:     { backgroundColor: C.primary, borderRadius: RADIUS.xl, padding: 14, alignItems: 'center', marginTop: 6, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+    primaryBtnText: { color: '#fff', fontSize: 16, fontFamily: FONT.bold },
+
+    biometricBtn:   { alignItems: 'center', padding: 20, marginBottom: 8, backgroundColor: C.primaryFixed + '25', borderRadius: RADIUS.xl },
+    biometricBtnPref: { backgroundColor: C.primaryFixed + '40', borderWidth: 1, borderColor: C.primary },
+    biometricText:  { fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.primary, marginTop: 8 },
+    biometricSub:   { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 2 },
+
+    divider:        { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
+    dividerLine:    { flex: 1, height: 0.5, backgroundColor: C.surfaceHigh },
+    dividerText:    { fontSize: 12, fontFamily: FONT.body, color: C.outline, marginHorizontal: 10 },
+
+    bioOptIn:       { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: RADIUS.lg, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh, marginBottom: 14 },
+    bioOptInActive: { backgroundColor: C.green[50], borderColor: C.green[400] },
+    bioOptInTitle:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    bioOptInDesc:   { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 1 },
+
+    switchBtn:      { alignSelf: 'center', padding: 12 },
+    switchBtnText:  { fontSize: 13, fontFamily: FONT.bodyMedium, textDecorationLine: 'underline' },
+  });
 }
-
-const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.primary },
-  header:         { alignItems: 'center', paddingVertical: 30 },
-  appName:        { fontSize: 32, fontFamily: FONT.headline, color: '#fff', letterSpacing: -0.5, marginTop: 8 },
-  tagline:        { fontSize: 13, fontFamily: FONT.body, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-
-  langRow:        { flexDirection: 'row', backgroundColor: '#fff', marginHorizontal: 20, borderRadius: RADIUS.xl, overflow: 'hidden', marginBottom: 8, alignSelf: 'center' },
-  langBtn:        { paddingHorizontal: 24, paddingVertical: 10, alignItems: 'center' },
-  langBtnActive:  { backgroundColor: COLORS.primaryFixed + '40' },
-  langBtnText:    { fontSize: 13, fontFamily: FONT.bodyMedium },
-  langBtnTextActive: { color: COLORS.primary, fontWeight: '700' },
-
-  scrollContent:  { padding: 20, paddingBottom: 120, flexGrow: 1 },
-
-  card: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xxl,
-    padding: 24, marginBottom: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8,
-  },
-  cardTitle:      { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginBottom: 4 },
-  cardSub:        { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginBottom: 20, lineHeight: 18 },
-
-  /* Role Toggle */
-  roleRow:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  roleLabel:      { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant },
-  roleToggle:     { flexDirection: 'row', gap: 6 },
-  roleOpt:        { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh },
-  roleOptActive:  { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  roleOptText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.outline },
-  roleOptTextActive: { color: '#fff' },
-
-  inputRow:       { marginBottom: 14 },
-  label:          { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, marginBottom: 4 },
-  input:          { backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.md, padding: 12, fontSize: 15, fontFamily: FONT.body, color: COLORS.onSurface, borderWidth: 1, borderColor: COLORS.surfaceHigh },
-
-  primaryBtn:     { backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, padding: 14, alignItems: 'center', marginTop: 6, shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontFamily: FONT.bold },
-
-  biometricBtn:   { alignItems: 'center', padding: 20, marginBottom: 8, backgroundColor: COLORS.primaryFixed + '25', borderRadius: RADIUS.xl },
-  biometricBtnPref: { backgroundColor: COLORS.primaryFixed + '40', borderWidth: 1, borderColor: COLORS.primary },
-  biometricText:  { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.primary, marginTop: 8 },
-  biometricSub:   { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 2 },
-
-  divider:        { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
-  dividerLine:    { flex: 1, height: 0.5, backgroundColor: COLORS.surfaceHigh },
-  dividerText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, marginHorizontal: 10 },
-
-  bioOptIn:       { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: RADIUS.lg, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh, marginBottom: 14 },
-  bioOptInActive: { backgroundColor: COLORS.green[50], borderColor: COLORS.green[400] },
-  bioOptInTitle:  { fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  bioOptInDesc:   { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginTop: 1 },
-
-  switchBtn:      { alignSelf: 'center', padding: 12 },
-  switchBtnText:  { fontSize: 13, fontFamily: FONT.bodyMedium, textDecorationLine: 'underline' },
-});

@@ -31,6 +31,43 @@ export const COLORS = {
   gray:     { 50: '#F1EFE8', 100: '#D3D1C7', 200: '#B4B2A9', 600: '#5F5E5A', 800: '#444441' },
   white:    '#FFFFFF',
   text:     { primary: '#1A1A18', secondary: '#5F5E5A', hint: '#B4B2A9' },
+  cardShadow: '#000',
+};
+
+export const DARK_COLORS = {
+  primary:        '#5ed4b0',
+  primaryContainer: '#006b54',
+  onPrimaryContainer: '#94e8cb',
+  primaryFixed:   '#1d9e75',
+
+  secondary:       '#89bcff',
+  secondaryContainer: '#004882',
+  onSecondaryFixedVariant: '#d6e8ff',
+
+  background:      '#0d1117',
+  surfaceLowest:   '#161b22',
+  surfaceLow:      '#1c2333',
+  surfaceHigh:     '#2d3748',
+
+  onSurface:       '#e6edf3',
+  onSurfaceVariant:'#b1bac4',
+  outline:         '#8b949e',
+
+  error:           '#ff6b6b',
+  warning:         '#ffa94d',
+  errorContainer:  '#4a1a1a',
+  errorMuted:      'rgba(255,107,107,0.30)',
+
+  teal:     { 50: '#0d2822', 100: '#1a4d3d', 400: '#5ed4b0', 600: '#3aa88a', 800: '#1d7a61' },
+  amber:    { 50: '#332206', 400: '#ffa94d', 800: '#ffd599' },
+  red:      { 50: '#3a1111', 400: '#ff6b6b', 800: '#ff9999' },
+  green:    { 50: '#1a3311', 400: '#4caf50', 500: '#66bb6a', 800: '#a5d6a7' },
+  goal:     { 50: '#1a3311', 500: '#66bb6a', 600: '#4caf50', 700: '#388e3c' },
+  blue:     { 50: '#0d2137', 400: '#58a6ff', 800: '#79b8ff' },
+  gray:     { 50: '#21262d', 100: '#30363d', 200: '#484f58', 600: '#8b949e', 800: '#c9d1d9' },
+  white:    '#ffffff',
+  text:     { primary: '#e6edf3', secondary: '#8b949e', hint: '#484f58' },
+  cardShadow: '#000',
 };
 
 export const FONT = {

@@ -5,6 +5,7 @@ import { Text, View, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { HighContrastProvider } from '../utils/HighContrastContext';
+import { useTheme } from '../utils/ThemeContext';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
 import LandingScreen from '../screens/LandingScreen';
 import AuthScreen from '../screens/AuthScreen';
@@ -14,6 +15,7 @@ import PrescriptionScreen from '../screens/PrescriptionScreen';
 import RemindersScreen from '../screens/RemindersScreen';
 import ReportScreen from '../screens/ReportScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import PrescriptionScheduleScreen from '../screens/PrescriptionScheduleScreen';
 import DoctorScreen from '../screens/DoctorScreen';
 
 const Tab = createBottomTabNavigator();
@@ -45,17 +47,18 @@ const DOCTOR_TABS = [
 ];
 
 function TabIcon({ icon, iconActive, focused, label }) {
+  const { COLORS: themeColors } = useTheme();
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', gap: 1 }}>
       <MaterialCommunityIcons
         name={focused ? iconActive : icon}
         size={24}
-        color={focused ? COLORS.primary : COLORS.outline}
+        color={focused ? themeColors.primary : themeColors.outline}
       />
       <Text style={{
         fontSize: 9,
         fontFamily: FONT.body,
-        color: focused ? COLORS.primary : COLORS.outline,
+        color: focused ? themeColors.primary : themeColors.outline,
         letterSpacing: 0.2,
       }}>
         {label}
@@ -65,13 +68,14 @@ function TabIcon({ icon, iconActive, focused, label }) {
 }
 
 function MainTabs({ userRole }) {
+  const { isDark } = useTheme();
   const tabs = userRole === 'doctor' ? DOCTOR_TABS : PATIENT_TABS;
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(255,255,255,0.85)',
+          backgroundColor: isDark ? '#161b22' : 'rgba(255,255,255,0.85)',
           borderTopWidth: 0,
           height: 66,
           paddingTop: 6,
@@ -106,6 +110,7 @@ export default function AppNavigator() {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState('patient');
+  const { COLORS: themeColors } = useTheme();
 
   useEffect(() => {
     setReady(true);
@@ -118,11 +123,11 @@ export default function AppNavigator() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
-        <Text style={{ fontSize: 28, fontFamily: FONT.headline, color: COLORS.primary, marginBottom: 16 }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center',           backgroundColor: themeColors.background }}>
+        <Text style={{ fontSize: 28, fontFamily: FONT.headline, color: themeColors.primary, marginBottom: 16 }}>
           MEDISAUTI
         </Text>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={themeColors.primary} />
       </View>
     );
   }
@@ -143,6 +148,7 @@ export default function AppNavigator() {
               {() => <MainTabs userRole={userRole} />}
             </Stack.Screen>
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="PrescriptionSchedule" component={PrescriptionScheduleScreen} />
           </>
         )}
       </Stack.Navigator>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView,
@@ -9,14 +9,16 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
-import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
+import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, saveUser } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { language, toggleLanguage, t } = useLanguage();
+  const { COLORS } = useTheme();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -25,6 +27,7 @@ export default function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+
 
   useFocusEffect(useCallback(() => {
     loadProfile();
@@ -84,6 +87,23 @@ export default function ProfileScreen() {
   }
 
   const avatarLetters = (name || 'U').slice(0, 2).toUpperCase();
+
+  function ProfileField({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
+    return (
+      <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <TextInput
+          style={[styles.fieldInput, multiline && { minHeight: 72, paddingTop: 10 }]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.outline}
+          keyboardType={keyboardType}
+          multiline={multiline}
+        />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'android' ? 'height' : 'padding'}>
@@ -151,157 +171,145 @@ export default function ProfileScreen() {
   );
 }
 
-function ProfileField({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
-  return (
-    <View style={styles.fieldGroup}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={[styles.fieldInput, multiline && { minHeight: 72, paddingTop: 10 }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.outline}
-        keyboardType={keyboardType}
-        multiline={multiline}
-      />
-    </View>
-  );
+
+function getStyles(C) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 0,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+      elevation: 1,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: RADIUS.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontFamily: FONT.headline,
+      color: C.onSurface,
+      letterSpacing: -0.3,
+    },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 40,
+    },
+    avatarSection: {
+      alignItems: 'center',
+      marginTop: 24,
+      marginBottom: 28,
+    },
+    avatarWrap: {
+      position: 'relative',
+    },
+    avatarCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: C.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: C.primary + '20',
+    },
+    avatarLetters: {
+      fontSize: 30,
+      fontFamily: FONT.headline,
+      color: '#fff',
+    },
+    avatarImageWrap: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      overflow: 'hidden',
+    },
+    avatarImagePlaceholder: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: C.primaryContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarImageText: {
+      fontSize: 30,
+      fontFamily: FONT.headline,
+      color: '#fff',
+    },
+    avatarBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: C.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.background,
+    },
+    avatarHint: {
+      fontSize: 12,
+      fontFamily: FONT.body,
+      color: C.onSurfaceVariant,
+      marginTop: 8,
+    },
+    formCard: {
+      backgroundColor: C.surfaceLowest,
+      borderRadius: RADIUS.xl,
+      padding: 20,
+      gap: 16,
+      ...SHADOW.sm,
+    },
+    fieldGroup: {
+      gap: 6,
+    },
+    fieldLabel: {
+      fontSize: 12,
+      fontFamily: FONT.bodySemiBold,
+      color: C.onSurfaceVariant,
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+    },
+    fieldInput: {
+      backgroundColor: C.surfaceLow,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      fontFamily: FONT.body,
+      color: C.onSurface,
+      borderWidth: 1,
+      borderColor: C.outline + '20',
+    },
+    saveBtn: {
+      backgroundColor: C.primary,
+      borderRadius: RADIUS.md,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+    },
+    saveBtnText: {
+      fontSize: 16,
+      fontFamily: FONT.bold,
+      color: '#fff',
+    },
+  });
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: FONT.headline,
-    color: COLORS.onSurface,
-    letterSpacing: -0.3,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 28,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: COLORS.primary + '20',
-  },
-  avatarLetters: {
-    fontSize: 30,
-    fontFamily: FONT.headline,
-    color: '#fff',
-  },
-  avatarImageWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    overflow: 'hidden',
-  },
-  avatarImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: COLORS.primaryContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImageText: {
-    fontSize: 30,
-    fontFamily: FONT.headline,
-    color: '#fff',
-  },
-  avatarBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.background,
-  },
-  avatarHint: {
-    fontSize: 12,
-    fontFamily: FONT.body,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 8,
-  },
-  formCard: {
-    backgroundColor: COLORS.surfaceLowest,
-    borderRadius: RADIUS.xl,
-    padding: 20,
-    gap: 16,
-    ...SHADOW.sm,
-  },
-  fieldGroup: {
-    gap: 6,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontFamily: FONT.bodySemiBold,
-    color: COLORS.onSurfaceVariant,
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  fieldInput: {
-    backgroundColor: COLORS.surfaceLow,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: FONT.body,
-    color: COLORS.onSurface,
-    borderWidth: 1,
-    borderColor: COLORS.outline + '20',
-  },
-  saveBtn: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  saveBtnText: {
-    fontSize: 16,
-    fontFamily: FONT.bold,
-    color: '#fff',
-  },
-});
+const styles = useMemo(() => getStyles(COLORS), [COLORS]);

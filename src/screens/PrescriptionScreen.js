@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, RefreshControl,
@@ -11,8 +11,9 @@ import { WebView } from 'react-native-webview';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'expo-camera';
 
-import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { RADIUS, FONT } from '../utils/constants';
 import { getPrescriptions, savePrescription, deletePrescription, getUser } from '../utils/storage';
+import { useTheme } from '../utils/ThemeContext';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { scheduleReminder, cancelReminder, normalizeTime } from '../utils/reminders';
@@ -21,61 +22,18 @@ import { parseWithAI, hasProvider, getProvider } from '../utils/ai';
 
 const INITIAL_FORM = {
   drugName: '', dosage: '', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
+  durationValue: '', durationUnit: 'days',
 };
 
-function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
-  return (
-    <View style={{ gap: 4 }}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={[styles.input, multiline && { minHeight: 72, paddingTop: 10 }]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={COLORS.outline}
-        keyboardType={keyboardType}
-        multiline={multiline}
-      />
-    </View>
-  );
-}
 
-function PrescriptionCard({ item, onDelete, onEdit }) {
-  const { t } = useLanguage();
-  return (
-    <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
-      <View style={styles.medCard}>
-        <View style={styles.medCardHeader}>
-          <View style={styles.medCardLeft}>
-            <View style={styles.medIconWrap}>
-              <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
-              <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
-            </View>
-            {item.source === 'doctor' && (
-              <View style={styles.docBadge}>
-                <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
-                <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
-              </View>
-            )}
-          </View>
-          <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
-            <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
-          </TouchableOpacity>
-        </View>
-        {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
-      </View>
-    </TouchableOpacity>
-  );
-}
 
 export default function PrescriptionScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
+  const { COLORS, isDark, toggleTheme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
   const scrollRef = useRef(null);
 
   const [user, setUser] = useState({ name: 'User' });
@@ -93,6 +51,54 @@ export default function PrescriptionScreen() {
   const pendingImageUri = useRef(null);
 
   const isEditing = editItem !== null;
+
+  function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
+    return (
+      <View style={{ gap: 4 }}>
+        <Text style={styles.inputLabel}>{label}</Text>
+        <TextInput
+          style={[styles.input, multiline && { minHeight: 72, paddingTop: 10 }]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.outline}
+          keyboardType={keyboardType}
+          multiline={multiline}
+        />
+      </View>
+    );
+  }
+
+  function PrescriptionCard({ item, onDelete, onEdit }) {
+    const { t } = useLanguage();
+    return (
+      <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
+        <View style={styles.medCard}>
+          <View style={styles.medCardHeader}>
+            <View style={styles.medCardLeft}>
+              <View style={styles.medIconWrap}>
+                <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
+                <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
+              </View>
+              {item.source === 'doctor' && (
+                <View style={styles.docBadge}>
+                  <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
+                  <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
+              <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+            </TouchableOpacity>
+          </View>
+          {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -122,6 +128,8 @@ export default function PrescriptionScreen() {
       notes: item.notes || '',
       source: item.source || 'manual',
       voiceNotif: item.voiceNotif !== false,
+      durationValue: item.durationValue || '',
+      durationUnit: item.durationUnit || 'days',
     });
     setShowForm(true);
   }
@@ -282,8 +290,8 @@ export default function PrescriptionScreen() {
           <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
-        <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
-          <MaterialCommunityIcons name="brightness-6" size={20} color={COLORS.onSurface} />
+        <TouchableOpacity onPress={toggleTheme} style={styles.iconBtn}>
+          <MaterialCommunityIcons name={isDark ? 'weather-sunny' : 'weather-night'} size={20} color={COLORS.onSurface} />
         </TouchableOpacity>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
           <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
@@ -399,6 +407,32 @@ export default function PrescriptionScreen() {
 
             <FormInput label={t('label_notes')} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('placeholder_notes')} multiline />
 
+            {/* Duration */}
+            <Text style={styles.inputLabel}>{t('label_duration')}</Text>
+            <View style={styles.durationRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={form.durationValue}
+                onChangeText={v => setForm(f => ({ ...f, durationValue: v.replace(/\D/g, '') }))}
+                placeholder={t('placeholder_duration')}
+                placeholderTextColor={COLORS.outline}
+                keyboardType="number-pad"
+              />
+              <View style={styles.durationUnitRow}>
+                {['days', 'weeks', 'months'].map(unit => (
+                  <TouchableOpacity
+                    key={unit}
+                    style={[styles.durationUnitBtn, form.durationUnit === unit && styles.durationUnitBtnActive]}
+                    onPress={() => setForm(f => ({ ...f, durationUnit: unit }))}
+                  >
+                    <Text style={[styles.durationUnitText, form.durationUnit === unit && styles.durationUnitTextActive]}>
+                      {t('duration_' + unit)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             {/* Voice Notification Toggle */}
             <View style={styles.voiceRow}>
               <MaterialCommunityIcons name={form.voiceNotif ? 'volume-high' : 'volume-off'} size={20} color={form.voiceNotif ? COLORS.primary : COLORS.outline} />
@@ -468,119 +502,129 @@ export default function PrescriptionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    backgroundColor: COLORS.background,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-    zIndex: 10,
-  },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5 },
-  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
-  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
-  avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: COLORS.primary + '20' },
-  avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:         { flex: 1, backgroundColor: C.background },
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 12,
+      backgroundColor: C.background,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+      zIndex: 10,
+    },
+    headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    headerTitle:    { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5 },
+    headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+    langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: C.onSurface },
+    avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.primary + '20' },
+    avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-  scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
+    scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
 
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, paddingVertical: 14,
-    marginBottom: 16,
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
-  },
-  addBtnText:     { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
+    addBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: C.primary, borderRadius: RADIUS.xl, paddingVertical: 14,
+      marginBottom: 16,
+      shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    },
+    addBtnText:     { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
 
-  medCard: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  medCardHeader:  { flexDirection: 'row', alignItems: 'flex-start' },
-  medCardLeft:    { flex: 1, flexDirection: 'row', gap: 12 },
-  medIconWrap:    { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.onPrimaryContainer + '25', alignItems: 'center', justifyContent: 'center' },
-  medCardName:    { fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  medCardSub:     { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 1 },
-  docBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.blue[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
-  docBadgeText:   { fontSize: 10, fontFamily: FONT.bodySemiBold, color: COLORS.blue[800] },
-  deleteBtn:      { padding: 4 },
-  medCardNotes:   { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 8, backgroundColor: COLORS.surfaceLow, padding: 10, borderRadius: RADIUS.md },
+    medCard: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 16,
+      marginBottom: 12,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    },
+    medCardHeader:  { flexDirection: 'row', alignItems: 'flex-start' },
+    medCardLeft:    { flex: 1, flexDirection: 'row', gap: 12 },
+    medIconWrap:    { width: 40, height: 40, borderRadius: 12, backgroundColor: C.onPrimaryContainer + '25', alignItems: 'center', justifyContent: 'center' },
+    medCardName:    { fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    medCardSub:     { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 1 },
+    docBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.blue[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' },
+    docBadgeText:   { fontSize: 10, fontFamily: FONT.bodySemiBold, color: C.blue[800] },
+    deleteBtn:      { padding: 4 },
+    medCardNotes:   { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 8, backgroundColor: C.surfaceLow, padding: 10, borderRadius: RADIUS.md },
 
-  emptyState:     { alignItems: 'center', paddingVertical: 60 },
-  emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: COLORS.onSurface, marginTop: 16 },
-  emptySub:       { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
+    emptyState:     { alignItems: 'center', paddingVertical: 60 },
+    emptyTitle:     { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface, marginTop: 16 },
+    emptySub:       { fontSize: 13, fontFamily: FONT.body, color: C.outline, textAlign: 'center', marginTop: 8, lineHeight: 20, paddingHorizontal: 20 },
 
-  /* Modal */
-  modalScreen:    { flex: 1, backgroundColor: COLORS.background },
-  modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: COLORS.surfaceLowest, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh },
-  modalTitle:     { fontSize: 16, fontFamily: FONT.bold, color: COLORS.onSurface },
-  modalCancel:    { fontSize: 14, fontFamily: FONT.body, color: COLORS.outline },
-  modalSave:      { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.primary },
-  modalContent:   { padding: 16, gap: 16, paddingBottom: 60 },
+    /* Modal */
+    modalScreen:    { flex: 1, backgroundColor: C.background },
+    modalHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: C.surfaceLowest, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
+    modalTitle:     { fontSize: 16, fontFamily: FONT.bold, color: C.onSurface },
+    modalCancel:    { fontSize: 14, fontFamily: FONT.body, color: C.outline },
+    modalSave:      { fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.primary },
+    modalContent:   { padding: 16, gap: 16, paddingBottom: 60 },
 
-  inputLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.3 },
-  input:          { backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: FONT.body, color: COLORS.onSurface, borderWidth: 1, borderColor: COLORS.surfaceHigh },
+    inputLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, letterSpacing: 0.3 },
+    input:          { backgroundColor: C.surfaceLow, borderRadius: RADIUS.md, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: FONT.body, color: C.onSurface, borderWidth: 1, borderColor: C.surfaceHigh },
 
-  sourceRow:      { gap: 8 },
-  sourceToggle:   { flexDirection: 'row', gap: 8 },
-  sourceOpt:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, borderWidth: 1, borderColor: COLORS.surfaceHigh },
-  sourceOptActive:{ backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  sourceOptText:  { fontSize: 13, fontFamily: FONT.body, color: COLORS.onSurfaceVariant },
-  sourceOptTextActive: { color: '#fff' },
+    sourceRow:      { gap: 8 },
+    sourceToggle:   { flexDirection: 'row', gap: 8 },
+    sourceOpt:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh },
+    sourceOptActive:{ backgroundColor: C.primary, borderColor: C.primary },
+    sourceOptText:  { fontSize: 13, fontFamily: FONT.body, color: C.onSurfaceVariant },
+    sourceOptTextActive: { color: '#fff' },
 
-  /* Frequency Presets */
-  freqRow:        { flexDirection: 'row', gap: 8 },
-  freqBtn:        { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, alignItems: 'center', borderWidth: 1, borderColor: COLORS.surfaceHigh },
-  freqBtnActive:  { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  freqBtnText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, textAlign: 'center' },
-  freqBtnTextActive: { color: '#fff' },
+    /* Frequency Presets */
+    freqRow:        { flexDirection: 'row', gap: 8 },
+    freqBtn:        { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, alignItems: 'center', borderWidth: 1, borderColor: C.surfaceHigh },
+    freqBtnActive:  { backgroundColor: C.primary, borderColor: C.primary },
+    freqBtnText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, textAlign: 'center' },
+    freqBtnTextActive: { color: '#fff' },
 
-  /* Time Period Pills */
-  timePillRow:    { flexDirection: 'row', gap: 8 },
-  timePill:       { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: COLORS.surfaceHigh },
-  timePillActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  timePillLabel:  { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
-  timePillLabelActive: { color: '#fff' },
-  timePillVal:    { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant },
-  timePillValActive: { color: '#fff', opacity: 0.85 },
+    /* Time Period Pills */
+    timePillRow:    { flexDirection: 'row', gap: 8 },
+    timePill:       { flex: 1, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: C.surfaceHigh },
+    timePillActive: { backgroundColor: C.primary, borderColor: C.primary },
+    timePillLabel:  { fontSize: 10, fontFamily: FONT.body, color: C.outline },
+    timePillLabelActive: { color: '#fff' },
+    timePillVal:    { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant },
+    timePillValActive: { color: '#fff', opacity: 0.85 },
 
-  /* Voice Toggle */
-  voiceRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  voiceLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, flex: 1 },
-  voiceToggle:    { width: 44, height: 24, borderRadius: 12, backgroundColor: COLORS.surfaceHigh, justifyContent: 'center', paddingHorizontal: 2 },
-  voiceToggleActive: { backgroundColor: COLORS.primary },
-  voiceKnob:      { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
-  voiceKnobActive:{ alignSelf: 'flex-end' },
+    /* Duration */
+    durationRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+    durationUnitRow: { flexDirection: 'row', gap: 4 },
+    durationUnitBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh },
+    durationUnitBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
+    durationUnitText: { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant },
+    durationUnitTextActive: { color: '#fff', fontFamily: FONT.bodySemiBold },
 
-  /* OCR Buttons */
-  ocrRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  ocrBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceLow,
-    borderWidth: 1, borderColor: COLORS.surfaceHigh,
-  },
-  ocrBtnText:     { fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.primary },
+    /* Voice Toggle */
+    voiceRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    voiceLabel:     { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, flex: 1 },
+    voiceToggle:    { width: 44, height: 24, borderRadius: 12, backgroundColor: C.surfaceHigh, justifyContent: 'center', paddingHorizontal: 2 },
+    voiceToggleActive: { backgroundColor: C.primary },
+    voiceKnob:      { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
+    voiceKnobActive:{ alignSelf: 'flex-end' },
 
-  /* OCR Overlay */
-  ocrOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center', justifyContent: 'center',
-    zIndex: 999,
-  },
-  ocrCard: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 32,
-    alignItems: 'center', gap: 12, marginHorizontal: 40,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 10,
-  },
-  ocrTitle:       { fontSize: 16, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  ocrProgBg:      { height: 6, borderRadius: 3, backgroundColor: COLORS.surfaceHigh, width: '100%', overflow: 'hidden' },
-  ocrProgFill:    { height: 6, borderRadius: 3, backgroundColor: COLORS.primary },
-  ocrProgText:    { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline },
-  ocrModeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, marginTop: 8 },
-  ocrModeText:    { fontSize: 10, fontFamily: FONT.bodySemiBold },
-});
+    /* OCR Buttons */
+    ocrRow:         { flexDirection: 'row', gap: 8, marginBottom: 16 },
+    ocrBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+      paddingVertical: 12, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow,
+      borderWidth: 1, borderColor: C.surfaceHigh,
+    },
+    ocrBtnText:     { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.primary },
+
+    /* OCR Overlay */
+    ocrOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      alignItems: 'center', justifyContent: 'center',
+      zIndex: 999,
+    },
+    ocrCard: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 32,
+      alignItems: 'center', gap: 12, marginHorizontal: 40,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 10,
+    },
+    ocrTitle:       { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    ocrProgBg:      { height: 6, borderRadius: 3, backgroundColor: C.surfaceHigh, width: '100%', overflow: 'hidden' },
+    ocrProgFill:    { height: 6, borderRadius: 3, backgroundColor: C.primary },
+    ocrProgText:    { fontSize: 12, fontFamily: FONT.body, color: C.outline },
+    ocrModeBadge:   { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, marginTop: 8 },
+    ocrModeText:    { fontSize: 10, fontFamily: FONT.bodySemiBold },
+  });
+}

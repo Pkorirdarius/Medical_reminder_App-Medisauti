@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Animated, Dimensions, Alert,
@@ -9,9 +9,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 
-import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
+import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, getPrescriptions } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SIDE_PAD = 16;
@@ -25,6 +26,8 @@ export default function ScanScreen() {
   const [scanning, setScanning] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
   const { language, toggleLanguage, t } = useLanguage();
+  const { COLORS } = useTheme();
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   useEffect(() => {
     (async () => {
@@ -188,10 +191,11 @@ export default function ScanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(C) {
+  return StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: C.background,
   },
   header: {
     flexDirection: 'row',
@@ -199,7 +203,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SIDE_PAD,
     paddingVertical: 12,
-    backgroundColor: COLORS.background,
+    backgroundColor: C.background,
     borderBottomWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -221,7 +225,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 20,
     fontFamily: FONT.headline,
-    color: COLORS.primary,
+    color: C.primary,
     letterSpacing: -0.5,
   },
   iconBtn: {
@@ -235,22 +239,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary + '12',
+    backgroundColor: C.primary + '12',
   },
   langBtnText: {
     fontSize: 11,
     fontFamily: FONT.bodyBold,
-    color: COLORS.primary,
+    color: C.primary,
   },
   avatar: {
     width: 36,
     height: 36,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primaryContainer,
+    backgroundColor: C.primaryContainer,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: COLORS.primary + '20',
+    borderColor: C.primary + '20',
   },
   avatarText: {
     fontSize: 12,
@@ -268,17 +272,17 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 32,
     fontFamily: FONT.headline,
-    color: COLORS.onSurface,
+    color: C.onSurface,
     letterSpacing: -0.5,
     lineHeight: 38,
   },
   heroTitleAccent: {
-    color: COLORS.primary,
+    color: C.primary,
   },
   heroSub: {
     fontSize: 15,
     fontFamily: FONT.body,
-    color: COLORS.onSurfaceVariant,
+    color: C.onSurfaceVariant,
     marginTop: 6,
     lineHeight: 22,
   },
@@ -287,9 +291,9 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 4,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    backgroundColor: COLORS.onSurface,
+    backgroundColor: C.onSurface,
     borderWidth: 3,
-    borderColor: COLORS.surfaceHigh,
+    borderColor: C.surfaceHigh,
     marginBottom: 16,
   },
   camera: {
@@ -311,7 +315,7 @@ const styles = StyleSheet.create({
     height: '50%',
     borderRadius: RADIUS.lg,
     borderWidth: 2,
-    borderColor: COLORS.primaryFixed,
+    borderColor: C.primaryFixed,
     overflow: 'hidden',
   },
   scanLine: {
@@ -320,8 +324,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 4,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: C.primary,
+    shadowColor: C.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 10,
@@ -331,28 +335,28 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 0, left: 0,
     width: 24, height: 24,
     borderTopWidth: 4, borderLeftWidth: 4,
-    borderColor: COLORS.primary,
+    borderColor: C.primary,
     borderTopLeftRadius: RADIUS.sm,
   },
   cornerTR: {
     position: 'absolute', top: 0, right: 0,
     width: 24, height: 24,
     borderTopWidth: 4, borderRightWidth: 4,
-    borderColor: COLORS.primary,
+    borderColor: C.primary,
     borderTopRightRadius: RADIUS.sm,
   },
   cornerBL: {
     position: 'absolute', bottom: 0, left: 0,
     width: 24, height: 24,
     borderBottomWidth: 4, borderLeftWidth: 4,
-    borderColor: COLORS.primary,
+    borderColor: C.primary,
     borderBottomLeftRadius: RADIUS.sm,
   },
   cornerBR: {
     position: 'absolute', bottom: 0, right: 0,
     width: 24, height: 24,
     borderBottomWidth: 4, borderRightWidth: 4,
-    borderColor: COLORS.primary,
+    borderColor: C.primary,
     borderBottomRightRadius: RADIUS.sm,
   },
   statusBadge: {
@@ -373,7 +377,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontFamily: FONT.bodyBold,
-    color: COLORS.primary,
+    color: C.primary,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -418,18 +422,18 @@ const styles = StyleSheet.create({
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceLow,
+    backgroundColor: C.surfaceLow,
     borderRadius: RADIUS.xl,
     padding: 16,
     gap: 14,
     borderWidth: 1,
-    borderColor: COLORS.outline + '12',
+    borderColor: C.outline + '12',
   },
   actionIconWrap: {
     width: 44,
     height: 44,
     borderRadius: RADIUS.lg,
-    backgroundColor: COLORS.secondaryContainer + '40',
+    backgroundColor: C.secondaryContainer + '40',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -439,16 +443,16 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 16,
     fontFamily: FONT.bold,
-    color: COLORS.onSurface,
+    color: C.onSurface,
   },
   actionDesc: {
     fontSize: 12,
     fontFamily: FONT.body,
-    color: COLORS.onSurfaceVariant,
+    color: C.onSurfaceVariant,
     marginTop: 2,
   },
   tipCard: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: C.primary,
     borderRadius: RADIUS.xl,
     padding: 24,
     overflow: 'hidden',
@@ -481,7 +485,7 @@ const styles = StyleSheet.create({
   tipDesc: {
     fontSize: 15,
     fontFamily: FONT.body,
-    color: COLORS.primaryFixed,
+    color: C.primaryFixed,
     lineHeight: 22,
   },
   tipDeco: {
@@ -493,4 +497,5 @@ const styles = StyleSheet.create({
     borderRadius: 90,
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
-});
+  });
+}

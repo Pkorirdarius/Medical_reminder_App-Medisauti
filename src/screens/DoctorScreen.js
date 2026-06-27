@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Alert,
@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, FONT } from '../utils/constants';
+import { RADIUS, FONT } from '../utils/constants';
 import { getUser, getPrescriptions, savePrescription, calcAdherence, getDailyStreak, getLogs } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const CONDITION_ICONS = {
   Kisukari: 'water',
@@ -24,6 +25,9 @@ export default function DoctorScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { t } = useLanguage();
+  const { COLORS } = useTheme();
+
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   const [patient, setPatient] = useState(null);
   const [prescriptions, setPrescriptions] = useState([]);
@@ -137,6 +141,12 @@ export default function DoctorScreen() {
       <View style={styles.header}>
         <MaterialCommunityIcons name="stethoscope" size={26} color={COLORS.primary} />
         <Text style={styles.headerTitle}>{t('header_doctor')}</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('PrescriptionSchedule')}
+          style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <MaterialCommunityIcons name="calendar-plus" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -234,6 +244,38 @@ export default function DoctorScreen() {
           );
         })()}
 
+        {/* Medication Analytics */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('medication_analytics')}</Text>
+          
+          {/* Per-medication breakdown */}
+          {prescriptions.length === 0 ? (
+            <Text style={styles.emptySub}>{t('no_meds_added')}</Text>
+          ) : (
+            prescriptions.map((rx, i) => {
+              const rxLogs = recentLogs.filter(l => l.prescriptionId === rx.id);
+              const taken = rxLogs.filter(l => l.status === 'taken').length;
+              const total = rxLogs.length;
+              const rxRate = total > 0 ? Math.round((taken / total) * 100) : 0;
+              const rxColor = rxRate >= 70 ? COLORS.goal[500] : rxRate >= 40 ? COLORS.warning : COLORS.error;
+              return (
+                <View key={rx.id || i} style={styles.analyticsRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rxName}>{rx.drugName} {rx.dosage}</Text>
+                    <Text style={styles.rxDetail}>{rx.frequency}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text style={[styles.analyticsRate, { color: rxColor }]}>{rxRate}%</Text>
+                    <View style={{ width: 60, height: 4, borderRadius: 2, backgroundColor: COLORS.surfaceHigh, overflow: 'hidden' }}>
+                      <View style={{ width: `${rxRate}%`, height: 4, borderRadius: 2, backgroundColor: rxColor }} />
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         {/* Recent Activity */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('recent_activity')}</Text>
@@ -293,60 +335,65 @@ export default function DoctorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen:               { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: COLORS.background,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-    zIndex: 10,
-  },
-  headerTitle:          { fontSize: 20, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5, flex: 1 },
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:               { flex: 1, backgroundColor: C.background },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 16, paddingVertical: 14,
+      backgroundColor: C.background,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+      zIndex: 10,
+    },
+    headerTitle:          { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5, flex: 1 },
 
-  scrollContent:        { padding: 16, paddingBottom: 100, gap: 16 },
+    scrollContent:        { padding: 16, paddingBottom: 100, gap: 16 },
 
-  /* Patient Card */
-  patientCard:          { backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  patientRow:           { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  patientAvatar:        { width: 48, height: 48, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  patientAvatarText:    { fontSize: 18, fontFamily: FONT.bodyBold, color: '#fff' },
-  patientName:          { fontSize: 17, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  patientMeta:          { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  patientMetaText:      { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline },
-  conditionBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.blue[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
-  conditionText:        { fontSize: 10, fontFamily: FONT.bodySemiBold, color: COLORS.blue[800] },
+    /* Patient Card */
+    patientCard:          { backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+    patientRow:           { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    patientAvatar:        { width: 48, height: 48, borderRadius: 14, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+    patientAvatarText:    { fontSize: 18, fontFamily: FONT.bodyBold, color: '#fff' },
+    patientName:          { fontSize: 17, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    patientMeta:          { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+    patientMetaText:      { fontSize: 12, fontFamily: FONT.body, color: C.outline },
+    conditionBadge:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.blue[50], borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 2, alignSelf: 'flex-start', marginTop: 4 },
+    conditionText:        { fontSize: 10, fontFamily: FONT.bodySemiBold, color: C.blue[800] },
 
-  adherenceBig:         { alignItems: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: COLORS.surfaceHigh },
-  adherenceBigValue:    { fontSize: 24, fontFamily: FONT.headline, color: COLORS.primary },
-  adherenceBigLabel:    { fontSize: 9, fontFamily: FONT.body, color: COLORS.outline, textTransform: 'uppercase', letterSpacing: 0.3 },
+    adherenceBig:         { alignItems: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: C.surfaceHigh },
+    adherenceBigValue:    { fontSize: 24, fontFamily: FONT.headline, color: C.primary },
+    adherenceBigLabel:    { fontSize: 9, fontFamily: FONT.body, color: C.outline, textTransform: 'uppercase', letterSpacing: 0.3 },
 
-  /* Card */
-  card:                 { backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
-  cardTitle:            { fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface, marginBottom: 12 },
+    /* Card */
+    card:                 { backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+    cardTitle:            { fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.onSurface, marginBottom: 12 },
 
-  /* Streak */
-  streakRow:            { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  streakItem:           { alignItems: 'center', gap: 4 },
-  streakDot:            { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  streakDateText:       { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
-  streakStatRow:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  streakStatText:       { fontSize: 13, fontFamily: FONT.bodySemiBold },
+    /* Streak */
+    streakRow:            { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    streakItem:           { alignItems: 'center', gap: 4 },
+    streakDot:            { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    streakDateText:       { fontSize: 10, fontFamily: FONT.body, color: C.outline },
+    streakStatRow:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    streakStatText:       { fontSize: 13, fontFamily: FONT.bodySemiBold },
 
-  /* Prescriptions List */
-  rxItem:               { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh },
-  rxName:               { fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  rxDetail:             { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline },
-  rxSourceBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2 },
-  rxSourceText:         { fontSize: 9, fontFamily: FONT.bodySemiBold },
+    /* Prescriptions List */
+    rxItem:               { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
+    rxName:               { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    rxDetail:             { fontSize: 11, fontFamily: FONT.body, color: C.outline },
+    rxSourceBadge:        { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 2 },
+    rxSourceText:         { fontSize: 9, fontFamily: FONT.bodySemiBold },
 
-  emptySub:             { fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', paddingVertical: 20 },
+    emptySub:             { fontSize: 12, fontFamily: FONT.body, color: C.outline, textAlign: 'center', paddingVertical: 20 },
 
-  /* Issue Button */
-  issueBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: COLORS.primary, borderRadius: RADIUS.xl, paddingVertical: 14,
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
-  },
-  issueBtnText:         { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
-});
+    analyticsRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
+    analyticsRate:        { fontSize: 16, fontFamily: FONT.bold },
+
+    /* Issue Button */
+    issueBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: C.primary, borderRadius: RADIUS.xl, paddingVertical: 14,
+      shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    },
+    issueBtnText:         { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
+  });
+}

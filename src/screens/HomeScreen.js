@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Animated, RefreshControl, Dimensions, Alert,
@@ -7,9 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { COLORS, RADIUS, SHADOW, FONT } from '../utils/constants';
+import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, getPrescriptions, calcAdherence, getDoctors, getMyDoctor, setMyDoctor } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
+import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
 
@@ -17,53 +18,11 @@ const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_GAP = 12;
 const SIDE_PAD = 16;
 
-function StatCard({ icon, iconColor, value, label, bg }) {
-  return (
-    <View style={[styles.statCard, { backgroundColor: bg || COLORS.surfaceLowest }]}>
-      <View style={[styles.statIconWrap, { backgroundColor: iconColor + '18' }]}>
-        <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
-      </View>
-      <Text style={[styles.statVal, { color: iconColor }]}>{value}</Text>
-      <Text style={styles.statLbl}>{label}</Text>
-    </View>
-  );
-}
-
-function Badge({ label, type }) {
-  const map = {
-    teal:  { bg: COLORS.primaryFixed + '40', text: COLORS.primary },
-    amber: { bg: COLORS.amber[50], text: COLORS.amber[400] },
-    green: { bg: COLORS.green[50], text: COLORS.green[400] },
-    blue:  { bg: COLORS.blue[50],  text: COLORS.blue[800] },
-  };
-  const c = map[type] || map.teal;
-  return (
-    <View style={[styles.badge, { backgroundColor: c.bg }]}>
-      <Text style={[styles.badgeText, { color: c.text }]}>{label}</Text>
-    </View>
-  );
-}
-
-function MedItem({ med }) {
-  return (
-    <View style={styles.medRow}>
-      <View style={[styles.medDot, { backgroundColor: COLORS.onPrimaryContainer + '30' }]}>
-        <MaterialCommunityIcons name="pill" size={18} color={COLORS.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.medName}>{med.drugName} {med.dosage}</Text>
-        <Text style={styles.medSub}>
-          {med.frequency} · {med.times.map(t => formatTime12(t)).join(', ')}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { highContrast, toggleHighContrast } = useHighContrast();
+  const { COLORS, isDark, toggleTheme } = useTheme();
   const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -93,6 +52,49 @@ export default function HomeScreen() {
     anim.start();
     return () => anim.stop();
   }, []);
+
+  function StatCard({ icon, iconColor, value, label, bg }) {
+    return (
+      <View style={[styles.statCard, { backgroundColor: bg || COLORS.surfaceLowest }]}>
+        <View style={[styles.statIconWrap, { backgroundColor: iconColor + '18' }]}>
+          <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
+        </View>
+        <Text style={[styles.statVal, { color: iconColor }]}>{value}</Text>
+        <Text style={styles.statLbl}>{label}</Text>
+      </View>
+    );
+  }
+
+  function Badge({ label, type }) {
+    const map = {
+      teal:  { bg: COLORS.primaryFixed + '40', text: COLORS.primary },
+      amber: { bg: COLORS.amber[50], text: COLORS.amber[400] },
+      green: { bg: COLORS.green[50], text: COLORS.green[400] },
+      blue:  { bg: COLORS.blue[50],  text: COLORS.blue[800] },
+    };
+    const c = map[type] || map.teal;
+    return (
+      <View style={[styles.badge, { backgroundColor: c.bg }]}>
+        <Text style={[styles.badgeText, { color: c.text }]}>{label}</Text>
+      </View>
+    );
+  }
+
+  function MedItem({ med }) {
+    return (
+      <View style={styles.medRow}>
+        <View style={[styles.medDot, { backgroundColor: COLORS.onPrimaryContainer + '30' }]}>
+          <MaterialCommunityIcons name="pill" size={18} color={COLORS.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.medName}>{med.drugName} {med.dosage}</Text>
+          <Text style={styles.medSub}>
+            {med.frequency} · {med.times.map(t => formatTime12(t)).join(', ')}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   async function loadData() {
     try {
@@ -166,6 +168,8 @@ export default function HomeScreen() {
   const rateColor = rate >= 80 ? COLORS.green[400] : rate >= 50 ? COLORS.amber[400] : COLORS.red[400];
   const rateBg   = rate >= 80 ? COLORS.green[50]  : rate >= 50 ? COLORS.amber[50]  : COLORS.red[50];
 
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* ── Header ── */}
@@ -178,8 +182,8 @@ export default function HomeScreen() {
           <TouchableOpacity onPress={toggleLanguage} style={styles.iconBtn}>
             <Text style={styles.langText}>{language === 'sw' ? 'SW' : 'EN'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={toggleHighContrast} style={styles.iconBtn}>
-            <MaterialCommunityIcons name={highContrast ? 'brightness-6' : 'brightness-6'} size={20} color={COLORS.onSurface} />
+          <TouchableOpacity onPress={toggleTheme} style={styles.iconBtn}>
+            <MaterialCommunityIcons name={isDark ? 'weather-sunny' : 'weather-night'} size={20} color={COLORS.onSurface} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatar}>
             <Text style={styles.avatarText}>{(user.name || 'U').slice(0, 2).toUpperCase()}</Text>
@@ -358,121 +362,122 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.background },
+function getStyles(C) {
+  return StyleSheet.create({
+    screen:         { flex: 1, backgroundColor: C.background },
 
-  /* ── Header ── */
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SIDE_PAD, paddingVertical: 12,
-    backgroundColor: COLORS.background,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-    zIndex: 10,
-  },
-  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoText:       { fontSize: 20, fontFamily: FONT.headline, color: COLORS.primary, letterSpacing: -0.5 },
-  headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' },
-  langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: COLORS.onSurface },
-  avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
+    /* ── Header ── */
+    header: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: SIDE_PAD, paddingVertical: 12,
+      backgroundColor: C.background,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+      zIndex: 10,
+    },
+    headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    logoText:       { fontSize: 20, fontFamily: FONT.headline, color: C.primary, letterSpacing: -0.5 },
+    headerRight:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn:        { width: 36, height: 36, borderRadius: 10, backgroundColor: C.surfaceLow, alignItems: 'center', justifyContent: 'center' },
+    langText:       { fontSize: 11, fontFamily: FONT.bodyBold, color: C.onSurface },
+    avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+    avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-  scrollContent:  { paddingHorizontal: SIDE_PAD, paddingTop: 8, paddingBottom: 30, flexGrow: 1 },
+    scrollContent:  { paddingHorizontal: SIDE_PAD, paddingTop: 8, paddingBottom: 30, flexGrow: 1 },
 
-  /* ── Hero ── */
-  hero:           { marginBottom: 16 },
-  greeting:       { fontSize: 15, fontFamily: FONT.body, color: COLORS.onSurfaceVariant },
-  userName:       { fontSize: 26, fontFamily: FONT.headline, color: COLORS.onSurface, letterSpacing: -0.5, marginTop: 0 },
+    /* ── Hero ── */
+    hero:           { marginBottom: 16 },
+    greeting:       { fontSize: 15, fontFamily: FONT.body, color: C.onSurfaceVariant },
+    userName:       { fontSize: 26, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5, marginTop: 0 },
 
-  /* ── Bento Cards ── */
-  bentoCard: {
-    backgroundColor: COLORS.surfaceLowest, borderRadius: RADIUS.xl,
-    padding: 18, marginBottom: CARD_GAP,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
+    /* ── Bento Cards ── */
+    bentoCard: {
+      backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl,
+      padding: 18, marginBottom: CARD_GAP,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+    },
 
-  /* ── Adherence Hero ── */
-  adhHeroCard:    { paddingVertical: 22 },
-  adhHeroTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase' },
-  sectionLabelSub:{ fontSize: 10, fontFamily: FONT.body, color: COLORS.outline, marginTop: 1 },
-  trendChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  trendText:      { fontSize: 11, fontFamily: FONT.bodySemiBold },
-  adhHeroMid:     { marginVertical: 4 },
-  adhHeroNum:     { fontSize: 56, fontFamily: FONT.headline, letterSpacing: -2, lineHeight: 62 },
-  progWrap:       { marginTop: 4 },
-  progBg:         { height: 8, borderRadius: 4 },
-  progFill:       { height: 8, borderRadius: 4 },
-  progLabels:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  progLabel:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.outline },
+    /* ── Adherence Hero ── */
+    adhHeroCard:    { paddingVertical: 22 },
+    adhHeroTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    sectionLabel:   { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, letterSpacing: 0.5, textTransform: 'uppercase' },
+    sectionLabelSub:{ fontSize: 10, fontFamily: FONT.body, color: C.outline, marginTop: 1 },
+    trendChip:      { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+    trendText:      { fontSize: 11, fontFamily: FONT.bodySemiBold },
+    adhHeroMid:     { marginVertical: 4 },
+    adhHeroNum:     { fontSize: 56, fontFamily: FONT.headline, letterSpacing: -2, lineHeight: 62 },
+    progWrap:       { marginTop: 4 },
+    progBg:         { height: 8, borderRadius: 4 },
+    progFill:       { height: 8, borderRadius: 4 },
+    progLabels:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+    progLabel:      { fontSize: 11, fontFamily: FONT.body, color: C.outline },
 
-  /* ── Stat Row ── */
-  statRow:        { flexDirection: 'row', gap: CARD_GAP, marginBottom: CARD_GAP },
-  statCard: {
-    flex: 1, borderRadius: RADIUS.xl, padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  statIconWrap:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  statVal:        { fontSize: 28, fontFamily: FONT.headline, letterSpacing: -1 },
-  statLbl:        { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 2, textAlign: 'center' },
+    /* ── Stat Row ── */
+    statRow:        { flexDirection: 'row', gap: CARD_GAP, marginBottom: CARD_GAP },
+    statCard: {
+      flex: 1, borderRadius: RADIUS.xl, padding: 16,
+      alignItems: 'center',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    },
+    statIconWrap:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+    statVal:        { fontSize: 28, fontFamily: FONT.headline, letterSpacing: -1 },
+    statLbl:        { fontSize: 11, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2, textAlign: 'center' },
 
-  /* ── Next Reminder ── */
-  nextCard:       { borderLeftWidth: 0 },
-  nextHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  nextBody:       { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  timeBubble: {
-    backgroundColor: COLORS.onPrimaryContainer + '25', borderRadius: RADIUS.lg,
-    paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center',
-  },
-  timeBig:        { fontSize: 22, fontFamily: FONT.bold, color: COLORS.primary, letterSpacing: -0.5 },
-  timeAmpm:       { fontSize: 10, fontFamily: FONT.bodySemiBold, color: COLORS.primary, opacity: 0.7 },
-  medNameLarge:   { fontSize: 16, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  medSub:         { fontSize: 12, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 2 },
-  speakBtn: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
-  },
-  speakingBar:    { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: COLORS.primaryFixed + '30', borderRadius: RADIUS.md, padding: 10 },
-  speakingText:   { fontSize: 12, fontFamily: FONT.body, color: COLORS.primary, flex: 1 },
+    /* ── Next Reminder ── */
+    nextCard:       { borderLeftWidth: 0 },
+    nextHeader:     { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+    nextBody:       { flexDirection: 'row', alignItems: 'center', gap: 14 },
+    timeBubble: {
+      backgroundColor: C.onPrimaryContainer + '25', borderRadius: RADIUS.lg,
+      paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center',
+    },
+    timeBig:        { fontSize: 22, fontFamily: FONT.bold, color: C.primary, letterSpacing: -0.5 },
+    timeAmpm:       { fontSize: 10, fontFamily: FONT.bodySemiBold, color: C.primary, opacity: 0.7 },
+    medNameLarge:   { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    medSub:         { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2 },
+    speakBtn: {
+      width: 44, height: 44, borderRadius: 14, backgroundColor: C.primary,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+    },
+    speakingBar:    { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: C.primaryFixed + '30', borderRadius: RADIUS.md, padding: 10 },
+    speakingText:   { fontSize: 12, fontFamily: FONT.body, color: C.primary, flex: 1 },
 
-  /* ── Week / Doctor ── */
-  insightRow:     { flexDirection: 'row', gap: CARD_GAP, marginBottom: CARD_GAP },
-  weekRow:        { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  weekCol:        { alignItems: 'center', gap: 4 },
-  weekDot:        { width: 20, height: 20, borderRadius: 6 },
-  weekLabel:      { fontSize: 10, fontFamily: FONT.body, color: COLORS.outline },
-  doctorCard: {
-    backgroundColor: COLORS.surfaceLowest,
-    flex: 0.7, alignItems: 'flex-start',
-  },
-  doctorTip:      { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, lineHeight: 16, marginTop: 4 },
+    /* ── Week / Doctor ── */
+    insightRow:     { flexDirection: 'row', gap: CARD_GAP, marginBottom: CARD_GAP },
+    weekRow:        { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+    weekCol:        { alignItems: 'center', gap: 4 },
+    weekDot:        { width: 20, height: 20, borderRadius: 6 },
+    weekLabel:      { fontSize: 10, fontFamily: FONT.body, color: C.outline },
+    doctorCard: {
+      backgroundColor: C.surfaceLowest,
+      flex: 0.7, alignItems: 'flex-start',
+    },
+    doctorTip:      { fontSize: 11, fontFamily: FONT.body, color: C.onSurfaceVariant, lineHeight: 16, marginTop: 4 },
 
-  /* ── Doctor Assign Card ── */
-  doctorAssignCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: COLORS.blue[50], borderRadius: RADIUS.xl, padding: 14, marginBottom: CARD_GAP,
-  },
-  doctorAssignLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  doctorAssignIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  doctorAssignLabel: { fontSize: 11, fontFamily: FONT.bodySemiBold, color: COLORS.blue[800], textTransform: 'uppercase', letterSpacing: 0.3 },
-  doctorAssignName: { fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface, marginTop: 1 },
-  doctorAssignSpec: { fontSize: 11, fontFamily: FONT.body, color: COLORS.blue[800], opacity: 0.7, marginTop: 1 },
-  doctorAssignEmpty: { fontSize: 12, fontFamily: FONT.body, color: COLORS.blue[800], opacity: 0.6, marginTop: 2 },
+    /* ── Doctor Assign Card ── */
+    doctorAssignCard: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: C.blue[50], borderRadius: RADIUS.xl, padding: 14, marginBottom: CARD_GAP,
+    },
+    doctorAssignLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+    doctorAssignIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+    doctorAssignLabel: { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.blue[800], textTransform: 'uppercase', letterSpacing: 0.3 },
+    doctorAssignName: { fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.onSurface, marginTop: 1 },
+    doctorAssignSpec: { fontSize: 11, fontFamily: FONT.body, color: C.blue[800], opacity: 0.7, marginTop: 1 },
+    doctorAssignEmpty: { fontSize: 12, fontFamily: FONT.body, color: C.blue[800], opacity: 0.6, marginTop: 2 },
 
-  /* ── Medication List ── */
-  medRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh,
-  },
-  medDot:         { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  medName:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface },
-  medSub:         { fontSize: 11, fontFamily: FONT.body, color: COLORS.onSurfaceVariant, marginTop: 1 },
-  badge:          { borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText:      { fontSize: 10, fontFamily: FONT.bodySemiBold },
+    /* ── Medication List ── */
+    medRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh,
+    },
+    medDot:         { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    medName:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    badge:          { borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 4 },
+    badgeText:      { fontSize: 10, fontFamily: FONT.bodySemiBold },
 
-  /* ── Empty State ── */
-  emptyState:     { alignItems: 'center', paddingVertical: 24 },
-  emptyText:      { fontSize: 13, fontFamily: FONT.body, color: COLORS.outline, lineHeight: 22, textAlign: 'center', marginTop: 12 },
-});
+    /* ── Empty State ── */
+    emptyState:     { alignItems: 'center', paddingVertical: 24 },
+    emptyText:      { fontSize: 13, fontFamily: FONT.body, color: C.outline, lineHeight: 22, textAlign: 'center', marginTop: 12 },
+  });
+}
