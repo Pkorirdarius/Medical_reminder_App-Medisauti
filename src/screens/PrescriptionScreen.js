@@ -52,23 +52,6 @@ export default function PrescriptionScreen() {
 
   const isEditing = editItem !== null;
 
-  function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
-    return (
-      <View style={{ gap: 4 }}>
-        <Text style={styles.inputLabel}>{label}</Text>
-        <TextInput
-          style={[styles.input, multiline && { minHeight: 72, paddingTop: 10 }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={COLORS.outline}
-          keyboardType={keyboardType}
-          multiline={multiline}
-        />
-      </View>
-    );
-  }
-
   function PrescriptionCard({ item, onDelete, onEdit }) {
     const { t } = useLanguage();
     return (
@@ -355,8 +338,8 @@ export default function PrescriptionScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
-            <FormInput label={t('label_drug_name')} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder={t('placeholder_drug_name')} />
-            <FormInput label={t('label_dosage')} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder={t('placeholder_dosage')} />
+            <FormInput label={t('label_drug_name')} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder={t('placeholder_drug_name')} labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+            <FormInput label={t('label_dosage')} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder={t('placeholder_dosage')} labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
             {/* Frequency Presets */}
             <Text style={styles.inputLabel}>{t('frequency_presets')}</Text>
@@ -402,7 +385,7 @@ export default function PrescriptionScreen() {
               })}
             </View>
 
-            <FormInput label={t('label_notes')} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('placeholder_notes')} multiline />
+            <FormInput label={t('label_notes')} value={form.notes} onChangeText={v => setForm(f => ({ ...f, notes: v }))} placeholder={t('placeholder_notes')} multiline labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
             {/* Duration */}
             <Text style={styles.inputLabel}>{t('label_duration')}</Text>
@@ -495,6 +478,23 @@ export default function PrescriptionScreen() {
           </View>
         </View>
       )}
+    </View>
+  );
+}
+
+function FormInput({ label, value, onChangeText, placeholder, keyboardType, multiline, labelStyle, inputStyle, placeholderColor }) {
+  return (
+    <View style={{ gap: 4 }}>
+      <Text style={labelStyle}>{label}</Text>
+      <TextInput
+        style={[inputStyle, multiline && { minHeight: 72, paddingTop: 10 }]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={placeholderColor}
+        keyboardType={keyboardType}
+        multiline={multiline}
+      />
     </View>
   );
 }

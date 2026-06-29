@@ -199,23 +199,6 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
-  function Input({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry }) {
-    return (
-      <View style={styles.inputRow}>
-        <Text style={styles.label}>{label}</Text>
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={COLORS.outline}
-          keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry}
-        />
-      </View>
-    );
-  }
-
   if (loading) {
     return (
       <View style={[styles.screen, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
@@ -266,20 +249,20 @@ export default function AuthScreen({ onAuthSuccess, route }) {
                 </View>
               </View>
 
-              <Input label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} />
-              <Input label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" />
+              <FormInput label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+              <FormInput label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
               {role === 'patient' ? (
                 <>
-                  <Input label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
-                  <Input label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} />
+                  <FormInput label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                  <FormInput label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
                 </>
               ) : (
-                <Input label={t('label_specialization')} value={specialization} onChangeText={setSpecialization} placeholder={t('placeholder_specialization')} />
+                <FormInput label={t('label_specialization')} value={specialization} onChangeText={setSpecialization} placeholder={t('placeholder_specialization')} containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
               )}
 
-              <Input label={t('label_set_pin')} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
-              <Input label={t('label_confirm_pin')} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <FormInput label={t('label_set_pin')} value={pin} onChangeText={v => setPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+              <FormInput label={t('label_confirm_pin')} value={confirmPin} onChangeText={v => setConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
               {biometricAvailable && (
                 <TouchableOpacity
@@ -357,7 +340,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
                 <View style={styles.dividerLine} />
               </View>
 
-              <Input label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry />
+              <FormInput label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
               <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
                 <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>
@@ -372,6 +355,23 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           )}
         </ScrollView>
       </View>
+    </View>
+  );
+}
+
+function FormInput({ label, value, onChangeText, placeholder, keyboardType, secureTextEntry, containerStyle, labelStyle, inputStyle, placeholderColor }) {
+  return (
+    <View style={containerStyle}>
+      <Text style={labelStyle}>{label}</Text>
+      <TextInput
+        style={inputStyle}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={placeholderColor}
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+      />
     </View>
   );
 }

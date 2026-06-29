@@ -106,23 +106,6 @@ export default function ProfileScreen({ onLogout }) {
 
   const avatarLetters = (name || 'U').slice(0, 2).toUpperCase();
 
-  function ProfileField({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
-    return (
-      <View style={styles.fieldGroup}>
-        <Text style={styles.fieldLabel}>{label}</Text>
-        <TextInput
-          style={[styles.fieldInput, multiline && { minHeight: 72, paddingTop: 10 }]}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={COLORS.outline}
-          keyboardType={keyboardType}
-          multiline={multiline}
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={{ flex: 1 }}>
       <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -166,10 +149,10 @@ export default function ProfileScreen({ onLogout }) {
 
               {/* ── Form ── */}
               <View style={styles.formCard}>
-                <ProfileField label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} />
-                <ProfileField label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" />
-                <ProfileField label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" />
-                <ProfileField label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} multiline />
+                <ProfileField label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                <ProfileField label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                <ProfileField label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                <ProfileField label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} multiline containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
                   {saving ? (
@@ -193,6 +176,22 @@ export default function ProfileScreen({ onLogout }) {
   );
 }
 
+function ProfileField({ label, value, onChangeText, placeholder, keyboardType, multiline, containerStyle, labelStyle, inputStyle, placeholderColor }) {
+  return (
+    <View style={containerStyle}>
+      <Text style={labelStyle}>{label}</Text>
+      <TextInput
+        style={[inputStyle, multiline && { minHeight: 72, paddingTop: 10 }]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={placeholderColor}
+        keyboardType={keyboardType}
+        multiline={multiline}
+      />
+    </View>
+  );
+}
 
 function getStyles(C) {
   return StyleSheet.create({
