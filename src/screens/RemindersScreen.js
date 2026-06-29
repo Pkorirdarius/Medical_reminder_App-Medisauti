@@ -12,7 +12,7 @@ import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
-import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
+import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission } from '../utils/reminders';
 
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number);
@@ -56,6 +56,7 @@ export default function RemindersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [doseStatus, setDoseStatus] = useState({});
+  const notifPermissionChecked = useRef(false);
 
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
@@ -128,6 +129,13 @@ export default function RemindersScreen() {
       if (u) setUser(u);
       const list = buildReminders(meds);
       setReminders(list);
+      if (!notifPermissionChecked.current) {
+        notifPermissionChecked.current = true;
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
+        }
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }

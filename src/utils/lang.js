@@ -191,6 +191,10 @@ const LANG = {
   voice_label:             { sw: 'Sauti', en: 'Voice' },
   voice_notif_enabled:     { sw: 'Arifa za sauti zimewashwa', en: 'Voice notifications on' },
   voice_notif_disabled:    { sw: 'Arifa za sauti zimezimwa', en: 'Voice notifications off' },
+  notif_permission_title:  { sw: 'Ruhusa ya arifa', en: 'Notification permission' },
+  notif_permission_body:   { sw: 'Tafadhali ruhusu arifa ili kupokea vikumbusho vya dawa zako.', en: 'Please allow notifications to receive medication reminders.' },
+  notif_permission_denied: { sw: 'Ruhusa ya arifa imekataliwa. Badilisha katika mipangilio ya simu yako.', en: 'Notification permission was denied. Enable it in your device settings.' },
+  notif_permission_granted:{ sw: 'Arifa zimewashwa!', en: 'Notifications enabled!' },
   notif_time:              { sw: 'Wakati wa kuchukua dawa', en: 'Time to take medication' },
   notif_voice_body:        { sw: 'Ni wakati wa kuchukua {drug}', en: 'Time to take {drug}' },
 

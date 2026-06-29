@@ -12,7 +12,7 @@ import { getUser, getPrescriptions, calcAdherence, getDoctors, getMyDoctor, setM
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
-import { speakReminder, formatTime12, getTimeLabel } from '../utils/reminders';
+import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission } from '../utils/reminders';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -36,6 +36,7 @@ export default function HomeScreen() {
   const [refreshing, setRef]     = useState(false);
   const [myDoctor, setMyDoc]     = useState(null);
   const [doctorsList, setDoctors] = useState([]);
+  const notifPermissionChecked = useRef(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -105,6 +106,13 @@ export default function HomeScreen() {
       setDoctors(docs);
       setMyDoc(myDoc);
       setNext(findNextReminder(meds));
+      if (!notifPermissionChecked.current) {
+        notifPermissionChecked.current = true;
+        const granted = await requestNotificationPermission();
+        if (!granted) {
+          Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
+        }
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRef(false); }
   }

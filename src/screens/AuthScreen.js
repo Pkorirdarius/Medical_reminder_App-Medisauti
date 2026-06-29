@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView,
+  Alert, ActivityIndicator, ScrollView,
   Platform, Animated,
 } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -226,7 +226,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'android' ? 'height' : 'padding'} keyboardVerticalOffset={Platform.OS === 'android' ? insets.top + 50 : 0}>
+    <View style={{ flex: 1 }}>
       <View style={styles.screen}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 20 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={true} bounces={false}>
           <View style={styles.header}>
@@ -372,7 +372,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           )}
         </ScrollView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

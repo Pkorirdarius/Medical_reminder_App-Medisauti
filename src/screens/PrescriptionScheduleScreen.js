@@ -1,8 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView,
-  Platform,
+  TextInput, Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -12,6 +11,7 @@ import { RADIUS, FONT } from '../utils/constants';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { getUser, savePrescription, saveSchedule, getPrescriptions } from '../utils/storage';
+import { requestNotificationPermission } from '../utils/reminders';
 
 export default function PrescriptionScheduleScreen() {
   const insets = useSafeAreaInsets();
@@ -61,6 +61,11 @@ export default function PrescriptionScheduleScreen() {
   async function handleIssue() {
     if (!drugName.trim() || !dosage.trim()) {
       Alert.alert(t('error'), t('validation_error'));
+      return;
+    }
+    const notifGranted = await requestNotificationPermission();
+    if (!notifGranted) {
+      Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
       return;
     }
     setSaving(true);
@@ -182,7 +187,7 @@ export default function PrescriptionScheduleScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'android' ? 'height' : 'padding'}>
+    <View style={{ flex: 1 }}>
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -353,7 +358,7 @@ export default function PrescriptionScheduleScreen() {
           <View style={{ height: 60 }} />
         </ScrollView>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
