@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, RefreshControl,
-  Modal, KeyboardAvoidingView, Platform,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -344,10 +344,7 @@ export default function PrescriptionScreen() {
 
       {/* ── Add/Edit Form Modal ── */}
       <Modal visible={showForm} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={[styles.modalScreen, { paddingTop: insets.top }]}
-        >
+        <View style={[styles.modalScreen, { paddingTop: insets.top }]}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={resetForm}>
               <Text style={styles.modalCancel}>{t('cancel')}</Text>
@@ -456,7 +453,7 @@ export default function PrescriptionScreen() {
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       {/* Hidden WebView for Tesseract.js OCR */}
