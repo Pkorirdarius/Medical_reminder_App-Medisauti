@@ -147,6 +147,12 @@ export default function DoctorScreen() {
         >
           <MaterialCommunityIcons name="calendar-plus" size={20} color={COLORS.primary} />
         </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Profile')}
+          style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <MaterialCommunityIcons name="account-cog" size={20} color={COLORS.primary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

@@ -17,6 +17,8 @@ import ReportScreen from '../screens/ReportScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import PrescriptionScheduleScreen from '../screens/PrescriptionScheduleScreen';
 import DoctorScreen from '../screens/DoctorScreen';
+import DoctorAnalyticsScreen from '../screens/DoctorAnalyticsScreen';
+import PatientSearchScreen from '../screens/PatientSearchScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -39,11 +41,9 @@ const PATIENT_TABS = [
 ];
 
 const DOCTOR_TABS = [
-  { name: 'Nyumbani',   label: 'Home',        icon: 'view-dashboard-outline',    iconActive: 'view-dashboard',       Component: HomeScreen },
-  { name: 'Dawa',       label: 'Meds',        icon: 'pill',                      iconActive: 'pill',                 Component: PrescriptionScreen },
-  { name: 'Vikumbusho', label: 'Reminders',   icon: 'bell-ring-outline',         iconActive: 'bell-ring',            Component: RemindersScreen },
-  { name: 'Ripoti',     label: 'Reports',     icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: ReportScreen },
-  { name: 'Daktari',    label: 'Doctor',      icon: 'stethoscope',               iconActive: 'stethoscope',          Component: DoctorScreen },
+  { name: 'Uchambuzi', label: 'Analytics',   icon: 'chart-box-outline',         iconActive: 'chart-box',            Component: DoctorAnalyticsScreen },
+  { name: 'Daktari',   label: 'Doctor',       icon: 'stethoscope',               iconActive: 'stethoscope',          Component: DoctorScreen },
+  { name: 'Wagonjwa',  label: 'Search',       icon: 'account-search-outline',    iconActive: 'account-search',       Component: PatientSearchScreen },
 ];
 
 function TabIcon({ icon, iconActive, focused, label }) {

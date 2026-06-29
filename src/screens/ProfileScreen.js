@@ -18,7 +18,7 @@ export default function ProfileScreen({ onLogout }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { language, toggleLanguage, t } = useLanguage();
-  const { COLORS } = useTheme();
+  const { COLORS, isDark, toggleTheme } = useTheme();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -160,6 +160,55 @@ export default function ProfileScreen({ onLogout }) {
                   ) : (
                     <Text style={styles.saveBtnText}>{t('btn_save_changes')}</Text>
                   )}
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Appearance & Language ── */}
+              <View style={[styles.formCard, { marginTop: 8 }]}>
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={toggleTheme}
+                  activeOpacity={0.6}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <MaterialCommunityIcons
+                      name={isDark ? 'weather-night' : 'weather-sunny'}
+                      size={22}
+                      color={isDark ? COLORS.amber[400] : COLORS.warning}
+                    />
+                    <View>
+                      <Text style={styles.toggleLabel}>{t(isDark ? 'dark_mode' : 'light_mode')}</Text>
+                      <Text style={styles.toggleHint}>{t('appearance')}</Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={20}
+                    color={COLORS.outline}
+                  />
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: COLORS.surfaceHigh }]} />
+                <TouchableOpacity
+                  style={styles.toggleRow}
+                  onPress={toggleLanguage}
+                  activeOpacity={0.6}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <MaterialCommunityIcons
+                      name="translate"
+                      size={22}
+                      color={COLORS.primary}
+                    />
+                    <View>
+                      <Text style={styles.toggleLabel}>{t('language')}</Text>
+                      <Text style={styles.toggleHint}>{t(language === 'sw' ? 'swahili' : 'english')}</Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={20}
+                    color={COLORS.outline}
+                  />
                 </TouchableOpacity>
               </View>
 
@@ -321,6 +370,27 @@ function getStyles(C) {
       fontSize: 16,
       fontFamily: FONT.bold,
       color: '#fff',
+    },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+    },
+    toggleLabel: {
+      fontSize: 15,
+      fontFamily: FONT.bodySemiBold,
+      color: C.onSurface,
+    },
+    toggleHint: {
+      fontSize: 12,
+      fontFamily: FONT.body,
+      color: C.outline,
+      marginTop: 1,
+    },
+    divider: {
+      height: 1,
+      marginVertical: 6,
     },
     logoutBtn: {
       flexDirection: 'row',

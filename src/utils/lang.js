@@ -266,6 +266,8 @@ const LANG = {
   // ── Dark Mode ────────────────────────────────────────────────
   dark_mode:               { sw: 'Hali ya giza', en: 'Dark mode' },
   light_mode:              { sw: 'Hali ya mwanga', en: 'Light mode' },
+  appearance:              { sw: 'Mwonekano', en: 'Appearance' },
+  language:                { sw: 'Lugha', en: 'Language' },
 
   // ── Duration ─────────────────────────────────────────────────
   label_duration:          { sw: 'Muda wa matumizi', en: 'Duration' },
@@ -303,6 +305,33 @@ const LANG = {
   total_doses:             { sw: 'Jumla ya dozi', en: 'Total Doses' },
   doses_remaining:         { sw: 'Zimesalia', en: 'Remaining' },
   no_data_analytics:       { sw: 'Hakuna data ya kutosha kwa uchambuzi.', en: 'Not enough data for analytics.' },
+
+  // ── Doctor Analytics ─────────────────────────────────────────
+  header_analytics:        { sw: 'Uchambuzi', en: 'Analytics' },
+  analytics_total_rx:      { sw: 'Dawa zote', en: 'Total Prescriptions' },
+  analytics_active_rx:     { sw: 'Zinazotumika', en: 'Active' },
+  analytics_avg_adherence: { sw: 'Wastani wa ufuataji', en: 'Avg Adherence' },
+  analytics_current_streak:{ sw: 'Msururu wa sasa', en: 'Current Streak' },
+  analytics_by_condition:  { sw: 'Kwa hali ya kiafya', en: 'By Condition' },
+  analytics_per_medication:{ sw: 'Kwa kila dawa', en: 'Per Medication' },
+  analytics_trend:         { sw: 'Mwendo wa ufuataji', en: 'Adherence Trend' },
+  analytics_no_data:       { sw: 'Hakuna data ya kutosha.', en: 'Not enough data.' },
+  trend_improving:         { sw: 'Inaongezeka', en: 'Improving' },
+  trend_worsening:         { sw: 'Inapungua', en: 'Worsening' },
+  trend_stable:            { sw: 'Imetulia', en: 'Stable' },
+  trend_insufficient:      { sw: 'Hakuna data', en: 'Insufficient data' },
+  condition_other:         { sw: 'Nyingine', en: 'Other' },
+
+  // ── Patient Search ───────────────────────────────────────────
+  header_search_patients:  { sw: 'Wagonjwa', en: 'Patients' },
+  search_placeholder:      { sw: 'Tafuta kwa jina la dawa au hali...', en: 'Search by drug name or condition...' },
+  condition_all:           { sw: 'Wote', en: 'All' },
+  no_search_results:       { sw: 'Hakuna matokeo.', en: 'No results found.' },
+  tab_analytics:           { sw: 'Uchambuzi', en: 'Analytics' },
+  tab_doctor:              { sw: 'Daktari', en: 'Doctor' },
+  tab_search:              { sw: 'Tafuta', en: 'Search' },
+  patient_record:          { sw: 'Rekodi ya mgonjwa', en: 'Patient Record' },
+  btn_schedule:            { sw: 'Ratiba mpya', en: 'New Schedule' },
 };
 
 export default LANG;
