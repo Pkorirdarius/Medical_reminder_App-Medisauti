@@ -121,6 +121,11 @@ export default function AppNavigator() {
     setAuthenticated(true);
   }
 
+  function handleLogout() {
+    setAuthenticated(false);
+    setUserRole('patient');
+  }
+
   if (!ready) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center',           backgroundColor: themeColors.background }}>
@@ -147,7 +152,9 @@ export default function AppNavigator() {
             <Stack.Screen name="Main">
               {() => <MainTabs userRole={userRole} />}
             </Stack.Screen>
-            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Profile">
+  {props => <ProfileScreen {...props} onLogout={handleLogout} />}
+</Stack.Screen>
             <Stack.Screen name="PrescriptionSchedule" component={PrescriptionScheduleScreen} />
           </>
         )}

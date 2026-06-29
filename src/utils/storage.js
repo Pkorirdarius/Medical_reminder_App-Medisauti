@@ -393,3 +393,8 @@ export async function getAdherenceTrend(days = 30) {
 
   return { direction, weeklyRates: valid };
 }
+
+export async function clearAllData() {
+  const keys = Object.values(KEYS);
+  await AsyncStorage.multiRemove(keys);
+}

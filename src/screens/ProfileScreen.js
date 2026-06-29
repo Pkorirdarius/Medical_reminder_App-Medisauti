@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -9,11 +9,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, saveUser } from '../utils/storage';
+import { getUser, saveUser, clearAllData } from '../utils/storage';
+import { cancelAllReminders } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ onLogout }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { language, toggleLanguage, t } = useLanguage();
@@ -85,6 +86,24 @@ export default function ProfileScreen() {
     finally { setSaving(false); }
   }
 
+  function handleLogout() {
+    Alert.alert(t('logout_confirm_title'), t('logout_confirm_body'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('btn_logout'), style: 'destructive',
+        onPress: async () => {
+          await cancelAllReminders();
+          await clearAllData();
+          if (onLogout) {
+            onLogout();
+          } else {
+            navigation.reset({ index: 0, routes: [{ name: 'Landing' }] });
+          }
+        },
+      },
+    ]);
+  }
+
   const avatarLetters = (name || 'U').slice(0, 2).toUpperCase();
 
   function ProfileField({ label, value, onChangeText, placeholder, keyboardType, multiline }) {
@@ -131,9 +150,7 @@ export default function ProfileScreen() {
                 <TouchableOpacity onPress={handlePickAvatar} style={styles.avatarWrap}>
                   {avatarUri ? (
                     <View style={styles.avatarImageWrap}>
-                      <View style={styles.avatarImagePlaceholder}>
-                        <Text style={styles.avatarImageText}>{avatarLetters}</Text>
-                      </View>
+                      <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
                     </View>
                   ) : (
                     <View style={styles.avatarCircle}>
@@ -144,7 +161,7 @@ export default function ProfileScreen() {
                     <MaterialCommunityIcons name="camera" size={14} color="#fff" />
                   </View>
                 </TouchableOpacity>
-                <Text style={styles.avatarHint}>{t('tap_change_photo')}</Text>
+                <Text style={styles.avatarHint}>{avatarUri ? t('change_photo') : t('tap_change_photo')}</Text>
               </View>
 
               {/* ── Form ── */}
@@ -162,6 +179,12 @@ export default function ProfileScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+
+              {/* ── Logout ── */}
+              <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
+                <MaterialCommunityIcons name="logout" size={20} color={COLORS.red[400]} />
+                <Text style={styles.logoutText}>{t('btn_logout')}</Text>
+              </TouchableOpacity>
             </>
           )}
         </ScrollView>
@@ -236,17 +259,9 @@ function getStyles(C) {
       borderRadius: 44,
       overflow: 'hidden',
     },
-    avatarImagePlaceholder: {
+    avatarImage: {
       width: '100%',
       height: '100%',
-      backgroundColor: C.primaryContainer,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarImageText: {
-      fontSize: 30,
-      fontFamily: FONT.headline,
-      color: '#fff',
     },
     avatarBadge: {
       position: 'absolute',
@@ -308,6 +323,22 @@ function getStyles(C) {
       fontFamily: FONT.bold,
       color: '#fff',
     },
+    logoutBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 24,
+      paddingVertical: 14,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: C.red[100],
+      backgroundColor: C.red[50],
+    },
+    logoutText: {
+      fontSize: 15,
+      fontFamily: FONT.bodySemiBold,
+      color: C.red[400],
+    },
   });
 }
-

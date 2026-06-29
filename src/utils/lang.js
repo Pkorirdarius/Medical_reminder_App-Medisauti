@@ -240,6 +240,10 @@ const LANG = {
   permission_desc:         { sw: 'Ruhusu ufikiaji wa picha ili kubadilisha picha yako.', en: 'Allow access to photos to change your profile picture.' },
   error_name_required:     { sw: 'Jina linahitajika.', en: 'Name is required.' },
   saved_profile:           { sw: 'Wasifu umehifadhiwa kwa mafanikio.', en: 'Profile updated successfully.' },
+  btn_logout:              { sw: 'Toka', en: 'Log out' },
+  logout_confirm_title:    { sw: 'Toka kwenye akaunti', en: 'Log out' },
+  logout_confirm_body:     { sw: 'Una uhakika unataka kutoka kwenye akaunti yako? Dawa na rekodi zitabaki kwenye kifaa.', en: 'Are you sure you want to log out? Your medications and records will remain on this device.' },
+  change_photo:            { sw: 'Badilisha picha', en: 'Change photo' },
 
   // ── Role Management ─────────────────────────────────────────
   role_patient:            { sw: 'Mgonjwa', en: 'Patient' },
