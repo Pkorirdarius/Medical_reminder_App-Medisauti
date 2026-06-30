@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
+import { isConfigured as fbConfigured, registerUser as fbRegister, loginUser as fbLogin } from '../utils/firebase';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -29,6 +30,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [specialization, setSpecialization] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
   const [loginPin, setLoginPin] = useState('');
   const [loginRole, setLoginRole] = useState('patient');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -162,7 +164,12 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         pin, createdAt: new Date().toISOString(),
         biometricEnabled: optInBio,
       };
-      await saveUser(user);
+
+      if (fbConfigured()) {
+        await fbRegister(phone.trim(), pin, user);
+      } else {
+        await saveUser(user);
+      }
 
       if (role === 'doctor') {
         await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
@@ -186,16 +193,26 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       return;
     }
     try {
-      const user = await getUser();
-      if (!user) {
-        Alert.alert(t('error'), t('no_account_found'));
-        return;
+      if (fbConfigured()) {
+        const uid = await fbLogin(loginPhone, loginPin);
+        const fbUser = await getUser();
+        if (!fbUser) {
+          Alert.alert(t('error'), t('no_account_found'));
+          return;
+        }
+        onAuthSuccess(fbUser.role || 'patient');
+      } else {
+        const user = await getUser();
+        if (!user) {
+          Alert.alert(t('error'), t('no_account_found'));
+          return;
+        }
+        if (user.pin !== loginPin) {
+          Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+          return;
+        }
+        onAuthSuccess(user.role || 'patient');
       }
-      if (user.pin !== loginPin) {
-        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
-        return;
-      }
-      onAuthSuccess(user.role || 'patient');
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
@@ -340,6 +357,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
                 <View style={styles.dividerLine} />
               </View>
 
+              <FormInput label={t('label_phone')} value={loginPhone} onChangeText={setLoginPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
               <FormInput label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
               <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>

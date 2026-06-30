@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as firebase from './firebase';
 
 const ENC_KEY = 'medisauti-2024-enc-key!';
 
@@ -16,8 +17,8 @@ function b64encode(str) {
     out += B64[c & 63];
   }
   const pad = str.length % 3;
-  if (pad === 1) { out = out.slice(0, -2) + '=='; }
-  else if (pad === 2) { out = out.slice(0, -1) + '='; }
+  if (pad === 1) out = out.slice(0, -2) + '==';
+  else if (pad === 2) out = out.slice(0, -1) + '=';
   return out;
 }
 
@@ -77,8 +78,7 @@ async function getItemDecrypted(key) {
   const encrypted = await AsyncStorage.getItem(key);
   if (!encrypted) return null;
   try {
-    const decrypted = decrypt(encrypted);
-    return JSON.parse(decrypted);
+    return JSON.parse(decrypt(encrypted));
   } catch {
     try {
       return JSON.parse(encrypted);
@@ -88,11 +88,35 @@ async function getItemDecrypted(key) {
   }
 }
 
+// ── Firebase helpers ───────────────────────────────────────────────
+function getUid() {
+  const u = firebase.getCurrentUser();
+  return u?.uid || null;
+}
+
+async function isFB() {
+  const uid = getUid();
+  return firebase.isConfigured() && !!uid;
+}
+
+// ── User ────────────────────────────────────────────────────────────
 export async function saveUser(user) {
-  await setItemEncrypted(KEYS.USER, user);
+  const uid = getUid();
+  if (firebase.isConfigured() && uid) {
+    await firebase.fbSaveUser(uid, user);
+  }
+  const existing = (await getItemDecrypted(KEYS.USER)) || {};
+  await setItemEncrypted(KEYS.USER, { ...existing, ...user });
 }
 
 export async function getUser() {
+  if (firebase.isConfigured()) {
+    const uid = getUid();
+    if (uid) {
+      const fbUser = await firebase.fbGetUser(uid);
+      if (fbUser) return fbUser;
+    }
+  }
   return getItemDecrypted(KEYS.USER);
 }
 
@@ -101,9 +125,13 @@ export async function getIsRegistered() {
   return user !== null && user.name && user.pin;
 }
 
+// ── Prescriptions ───────────────────────────────────────────────────
 export async function getPrescriptions() {
-  const data = await getItemDecrypted(KEYS.PRESCRIPTIONS);
-  return data || [];
+  if (await isFB()) {
+    const data = await firebase.fbGetPrescriptions(getUid());
+    if (data && data.length > 0) return data;
+  }
+  return (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
 }
 
 export async function savePrescription(prescription) {
@@ -115,66 +143,74 @@ export async function savePrescription(prescription) {
     list.push({ ...prescription, id: prescription.id || Date.now().toString() });
   }
   await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
+  if (await isFB()) {
+    await firebase.fbSavePrescription(getUid(), prescription);
+  }
 }
 
 export async function deletePrescription(id) {
   const list = await getPrescriptions();
   const updated = list.filter(p => p.id !== id);
   await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
+  if (await isFB()) {
+    await firebase.fbDeletePrescription(getUid(), id);
+  }
 }
 
+// ── Adherence Logs ──────────────────────────────────────────────────
 export async function getLogs() {
-  const data = await getItemDecrypted(KEYS.ADHERENCE);
-  return data || [];
+  if (await isFB()) {
+    const data = await firebase.fbGetLogs(getUid());
+    if (data && data.length > 0) return data;
+  }
+  return (await getItemDecrypted(KEYS.ADHERENCE)) || [];
 }
 
 export async function logDose(prescriptionId, status, scheduledTime) {
   const logs = await getLogs();
-  logs.push({
-    id:             Date.now().toString(),
+  const logEntry = {
+    id: Date.now().toString(),
     prescriptionId,
     status,
     scheduledTime,
-    loggedAt:       new Date().toISOString(),
-  });
+    loggedAt: new Date().toISOString(),
+  };
+  logs.push(logEntry);
   await setItemEncrypted(KEYS.ADHERENCE, logs);
+  if (await isFB()) {
+    await firebase.fbLogDose(getUid(), prescriptionId, status, scheduledTime);
+  }
 }
 
+// ── Analytics (computed from local logs, always use local) ──────────
 export async function calcAdherence(days = 30) {
   const logs = await getLogs();
   const since = new Date();
   since.setDate(since.getDate() - days);
-
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
   const taken  = recent.filter(l => l.status === 'taken').length;
   const missed = recent.filter(l => l.status === 'missed').length;
   const total  = recent.length;
   const rate   = total > 0 ? Math.round((taken / total) * 100) : 0;
-
   return { rate, taken, missed, total };
 }
 
 export async function getDailyStreak(days = 7) {
   const logs = await getLogs();
   const result = [];
-
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().slice(0, 10);
-
     const dayLogs = logs.filter(l => l.loggedAt.startsWith(dateStr));
     const taken   = dayLogs.filter(l => l.status === 'taken').length;
     const missed  = dayLogs.filter(l => l.status === 'missed').length;
-
     let status = 'none';
     if (taken > 0 && missed === 0) status = 'taken';
     else if (missed > 0 && taken === 0) status = 'missed';
     else if (taken > 0 && missed > 0) status = 'partial';
-
     result.push({ date: dateStr, status, taken, missed });
   }
-
   return result;
 }
 
@@ -182,39 +218,29 @@ export async function getPerMedicationAdherence(days = 30) {
   const [logs, prescriptions] = await Promise.all([getLogs(), getPrescriptions()]);
   const since = new Date();
   since.setDate(since.getDate() - days);
-
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
   const medMap = {};
-
   for (const log of recent) {
     if (!medMap[log.prescriptionId]) {
       const med = prescriptions.find(p => p.id === log.prescriptionId);
       medMap[log.prescriptionId] = {
         drugName: med ? med.drugName : 'Unknown',
         dosage: med ? med.dosage : '',
-        taken: 0,
-        missed: 0,
-        total: 0,
+        taken: 0, missed: 0, total: 0,
       };
     }
     medMap[log.prescriptionId].total++;
     if (log.status === 'taken') medMap[log.prescriptionId].taken++;
     if (log.status === 'missed') medMap[log.prescriptionId].missed++;
   }
-
-  return Object.values(medMap).map(m => ({
-    ...m,
-    rate: m.total > 0 ? Math.round((m.taken / m.total) * 100) : 0,
-  }));
+  return Object.values(medMap).map(m => ({ ...m, rate: m.total > 0 ? Math.round((m.taken / m.total) * 100) : 0 }));
 }
 
 export async function getMissedDosePatterns(days = 30) {
   const logs = await getLogs();
   const since = new Date();
   since.setDate(since.getDate() - days);
-
   const patterns = { morning: 0, afternoon: 0, evening: 0, night: 0 };
-
   const missed = logs.filter(l => l.status === 'missed' && new Date(l.loggedAt) >= since);
   for (const log of missed) {
     const hour = new Date(log.scheduledTime).getHours();
@@ -223,75 +249,7 @@ export async function getMissedDosePatterns(days = 30) {
     else if (hour < 20) patterns.evening++;
     else patterns.night++;
   }
-
   return patterns;
-}
-
-const CONDITION_PRESETS = {
-  diabetes: [
-    { drugName: 'Metformin', dosage: '500mg', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
-  ],
-  bp: [
-    { drugName: 'Amlodipine', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
-  ],
-  hiv: [
-    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala', source: 'system', voiceNotif: true },
-  ],
-};
-
-// ── Doctor / Role Management ──────────────────────────────────────────
-export async function getDoctors() {
-  const data = await getItemDecrypted(KEYS.DOCTORS);
-  return data || [];
-}
-
-export async function saveDoctorProfile(doctor) {
-  const list = await getDoctors();
-  const idx = list.findIndex(d => d.phone === doctor.phone);
-  if (idx >= 0) {
-    list[idx] = { ...doctor, updatedAt: new Date().toISOString() };
-  } else {
-    list.push({ ...doctor, id: Date.now().toString(), createdAt: new Date().toISOString() });
-  }
-  await setItemEncrypted(KEYS.DOCTORS, list);
-}
-
-export async function getMyDoctor() {
-  return getItemDecrypted(KEYS.MY_DOCTOR);
-}
-
-export async function setMyDoctor(doctor) {
-  if (doctor) {
-    await setItemEncrypted(KEYS.MY_DOCTOR, doctor);
-  } else {
-    await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
-  }
-}
-
-export async function addConditionPrescriptions(condition) {
-  const c = condition.toLowerCase();
-  let presets = [];
-  if (c.includes('kisukari') || c.includes('diabetes')) presets = CONDITION_PRESETS.diabetes;
-  else if (c.includes('shinikizo') || c.includes('blood pressure') || c.includes('bp') || c.includes('damu')) presets = CONDITION_PRESETS.bp;
-  else if (c.includes('hiv') || c.includes('vvu')) presets = CONDITION_PRESETS.hiv;
-
-  if (presets.length === 0) return [];
-
-  const existing = await getPrescriptions();
-  const created = [];
-  for (const preset of presets) {
-    const rx = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
-      ...preset,
-      createdAt: new Date().toISOString(),
-      active: true,
-      notifIds: [],
-    };
-    existing.push(rx);
-    created.push(rx);
-  }
-  await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
-  return created;
 }
 
 export async function getCurrentStreak() {
@@ -299,18 +257,13 @@ export async function getCurrentStreak() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let streak = 0;
-  let checking = new Date(today);
-
+  const checking = new Date(today);
   while (true) {
     const dateStr = checking.toISOString().slice(0, 10);
     const dayLogs = logs.filter(l => l.loggedAt.startsWith(dateStr));
     const taken = dayLogs.filter(l => l.status === 'taken').length;
-    if (taken > 0) {
-      streak++;
-      checking.setDate(checking.getDate() - 1);
-    } else {
-      break;
-    }
+    if (taken > 0) { streak++; checking.setDate(checking.getDate() - 1); }
+    else break;
   }
   return streak;
 }
@@ -320,13 +273,11 @@ export async function getBestStreak(days = 90) {
   const since = new Date();
   since.setDate(since.getDate() - days);
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
-
   const dayMap = {};
   for (const log of recent) {
     const day = log.loggedAt.slice(0, 10);
     if (log.status === 'taken') dayMap[day] = (dayMap[day] || 0) + 1;
   }
-
   let best = 0, current = 0;
   const sorted = Object.keys(dayMap).sort();
   for (let i = 0; i < sorted.length; i++) {
@@ -340,42 +291,26 @@ export async function getBestStreak(days = 90) {
   return best;
 }
 
-export async function saveSchedule(schedule) {
-  const schedules = await getSchedules();
-  schedules.push({ ...schedule, id: schedule.id || Date.now().toString() });
-  await setItemEncrypted(KEYS.SCHEDULES, schedules);
-}
-
-export async function getSchedules() {
-  const data = await getItemDecrypted(KEYS.SCHEDULES);
-  return data || [];
-}
-
 export async function getAdherenceTrend(days = 30) {
   const logs = await getLogs();
   const since = new Date();
   since.setDate(since.getDate() - days);
-
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
   const weeks = Math.ceil(days / 7);
   const weeklyRates = [];
-
   for (let w = 0; w < weeks; w++) {
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - days + w * 7);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
-
     const weekLogs = recent.filter(l => {
       const d = new Date(l.loggedAt);
       return d >= weekStart && d <= weekEnd;
     });
-
     const taken = weekLogs.filter(l => l.status === 'taken').length;
     const total = weekLogs.length;
     weeklyRates.push(total > 0 ? Math.round((taken / total) * 100) : -1);
   }
-
   const valid = weeklyRates.filter(r => r >= 0);
   let direction = 'insufficient';
   if (valid.length >= 2) {
@@ -390,10 +325,108 @@ export async function getAdherenceTrend(days = 30) {
   } else if (valid.length === 1) {
     direction = valid[0] >= 80 ? 'stable' : 'insufficient';
   }
-
   return { direction, weeklyRates: valid };
 }
 
+// ── Doctor Management ───────────────────────────────────────────────
+export async function getDoctors() {
+  if (firebase.isConfigured()) {
+    const data = await firebase.fbGetDoctors();
+    if (data && data.length > 0) return data;
+  }
+  return (await getItemDecrypted(KEYS.DOCTORS)) || [];
+}
+
+export async function saveDoctorProfile(doctor) {
+  const list = await getDoctors();
+  const idx = list.findIndex(d => d.phone === doctor.phone);
+  if (idx >= 0) {
+    list[idx] = { ...doctor, updatedAt: new Date().toISOString() };
+  } else {
+    list.push({ ...doctor, id: Date.now().toString(), createdAt: new Date().toISOString() });
+  }
+  await setItemEncrypted(KEYS.DOCTORS, list);
+  if (firebase.isConfigured()) {
+    await firebase.fbSaveDoctor(doctor);
+  }
+}
+
+export async function getMyDoctor() {
+  if (await isFB()) {
+    const data = await firebase.fbGetMyDoctor(getUid());
+    if (data) return data;
+  }
+  return getItemDecrypted(KEYS.MY_DOCTOR);
+}
+
+export async function setMyDoctor(doctor) {
+  await setItemEncrypted(KEYS.MY_DOCTOR, doctor);
+  if (await isFB()) {
+    await firebase.fbSetMyDoctor(getUid(), doctor);
+  } else if (!doctor) {
+    await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
+  }
+}
+
+// ── Condition Presets ───────────────────────────────────────────────
+const CONDITION_PRESETS = {
+  diabetes: [
+    { drugName: 'Metformin', dosage: '500mg', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
+  ],
+  bp: [
+    { drugName: 'Amlodipine', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
+  ],
+  hiv: [
+    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala', source: 'system', voiceNotif: true },
+  ],
+};
+
+export async function addConditionPrescriptions(condition) {
+  const c = condition.toLowerCase();
+  let presets = [];
+  if (c.includes('kisukari') || c.includes('diabetes')) presets = CONDITION_PRESETS.diabetes;
+  else if (c.includes('shinikizo') || c.includes('blood pressure') || c.includes('bp') || c.includes('damu')) presets = CONDITION_PRESETS.bp;
+  else if (c.includes('hiv') || c.includes('vvu')) presets = CONDITION_PRESETS.hiv;
+  if (presets.length === 0) return [];
+  const existing = await getPrescriptions();
+  const created = [];
+  for (const preset of presets) {
+    const rx = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
+      ...preset,
+      createdAt: new Date().toISOString(),
+      active: true,
+      notifIds: [],
+    };
+    existing.push(rx);
+    created.push(rx);
+    if (await isFB()) {
+      await firebase.fbSavePrescription(getUid(), rx);
+    }
+  }
+  await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
+  return created;
+}
+
+// ── Schedules ───────────────────────────────────────────────────────
+export async function saveSchedule(schedule) {
+  const schedules = await getSchedules();
+  schedules.push({ ...schedule, id: schedule.id || Date.now().toString() });
+  await setItemEncrypted(KEYS.SCHEDULES, schedules);
+  if (await isFB()) {
+    await firebase.fbSaveSchedule(getUid(), schedule);
+  }
+}
+
+export async function getSchedules() {
+  if (await isFB()) {
+    const data = await firebase.fbGetSchedules(getUid());
+    if (data && data.length > 0) return data;
+  }
+  return (await getItemDecrypted(KEYS.SCHEDULES)) || [];
+}
+
+// ── Clear All (local only — keeps Firebase data intact) ────────────
 export async function clearAllData() {
   const keys = Object.values(KEYS);
   await AsyncStorage.multiRemove(keys);
