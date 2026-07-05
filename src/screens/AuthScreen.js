@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
-import { isConfigured as fbConfigured, registerUser as fbRegister, loginUser as fbLogin } from '../utils/firebase';
+import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin } from '../utils/supabase';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -165,8 +165,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         biometricEnabled: optInBio,
       };
 
-      if (fbConfigured()) {
-        await fbRegister(phone.trim(), pin, user);
+      if (sbConfigured()) {
+        await sbRegister(phone.trim(), pin, user);
       } else {
         await saveUser(user);
       }
@@ -193,14 +193,14 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       return;
     }
     try {
-      if (fbConfigured()) {
-        const uid = await fbLogin(loginPhone, loginPin);
-        const fbUser = await getUser();
-        if (!fbUser) {
+      if (sbConfigured()) {
+        const uid = await sbLogin(loginPhone, loginPin);
+        const remoteUser = await getUser();
+        if (!remoteUser) {
           Alert.alert(t('error'), t('no_account_found'));
           return;
         }
-        onAuthSuccess(fbUser.role || 'patient');
+        onAuthSuccess(remoteUser.role || 'patient');
       } else {
         const user = await getUser();
         if (!user) {

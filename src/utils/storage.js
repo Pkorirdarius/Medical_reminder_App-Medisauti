@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as firebase from './firebase';
+import * as supabase from './supabase';
 
 const ENC_KEY = 'medisauti-2024-enc-key!';
 
@@ -90,30 +90,30 @@ async function getItemDecrypted(key) {
 
 // ── Firebase helpers ───────────────────────────────────────────────
 function getUid() {
-  const u = firebase.getCurrentUser();
+  const u = supabase.getCurrentUser();
   return u?.uid || null;
 }
 
 async function isFB() {
   const uid = getUid();
-  return firebase.isConfigured() && !!uid;
+  return supabase.isConfigured() && !!uid;
 }
 
 // ── User ────────────────────────────────────────────────────────────
 export async function saveUser(user) {
   const uid = getUid();
-  if (firebase.isConfigured() && uid) {
-    await firebase.fbSaveUser(uid, user);
+  if (supabase.isConfigured() && uid) {
+    await supabase.fbSaveUser(uid, user);
   }
   const existing = (await getItemDecrypted(KEYS.USER)) || {};
   await setItemEncrypted(KEYS.USER, { ...existing, ...user });
 }
 
 export async function getUser() {
-  if (firebase.isConfigured()) {
+  if (supabase.isConfigured()) {
     const uid = getUid();
     if (uid) {
-      const fbUser = await firebase.fbGetUser(uid);
+      const fbUser = await supabase.fbGetUser(uid);
       if (fbUser) return fbUser;
     }
   }
@@ -128,7 +128,7 @@ export async function getIsRegistered() {
 // ── Prescriptions ───────────────────────────────────────────────────
 export async function getPrescriptions() {
   if (await isFB()) {
-    const data = await firebase.fbGetPrescriptions(getUid());
+    const data = await supabase.fbGetPrescriptions(getUid());
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
@@ -144,7 +144,7 @@ export async function savePrescription(prescription) {
   }
   await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
   if (await isFB()) {
-    await firebase.fbSavePrescription(getUid(), prescription);
+    await supabase.fbSavePrescription(getUid(), prescription);
   }
 }
 
@@ -153,14 +153,14 @@ export async function deletePrescription(id) {
   const updated = list.filter(p => p.id !== id);
   await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
   if (await isFB()) {
-    await firebase.fbDeletePrescription(getUid(), id);
+    await supabase.fbDeletePrescription(getUid(), id);
   }
 }
 
 // ── Adherence Logs ──────────────────────────────────────────────────
 export async function getLogs() {
   if (await isFB()) {
-    const data = await firebase.fbGetLogs(getUid());
+    const data = await supabase.fbGetLogs(getUid());
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.ADHERENCE)) || [];
@@ -178,7 +178,7 @@ export async function logDose(prescriptionId, status, scheduledTime) {
   logs.push(logEntry);
   await setItemEncrypted(KEYS.ADHERENCE, logs);
   if (await isFB()) {
-    await firebase.fbLogDose(getUid(), prescriptionId, status, scheduledTime);
+    await supabase.fbLogDose(getUid(), prescriptionId, status, scheduledTime);
   }
 }
 
@@ -330,8 +330,8 @@ export async function getAdherenceTrend(days = 30) {
 
 // ── Doctor Management ───────────────────────────────────────────────
 export async function getDoctors() {
-  if (firebase.isConfigured()) {
-    const data = await firebase.fbGetDoctors();
+  if (supabase.isConfigured()) {
+    const data = await supabase.fbGetDoctors();
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.DOCTORS)) || [];
@@ -346,14 +346,14 @@ export async function saveDoctorProfile(doctor) {
     list.push({ ...doctor, id: Date.now().toString(), createdAt: new Date().toISOString() });
   }
   await setItemEncrypted(KEYS.DOCTORS, list);
-  if (firebase.isConfigured()) {
-    await firebase.fbSaveDoctor(doctor);
+  if (supabase.isConfigured()) {
+    await supabase.fbSaveDoctor(doctor);
   }
 }
 
 export async function getMyDoctor() {
   if (await isFB()) {
-    const data = await firebase.fbGetMyDoctor(getUid());
+    const data = await supabase.fbGetMyDoctor(getUid());
     if (data) return data;
   }
   return getItemDecrypted(KEYS.MY_DOCTOR);
@@ -362,7 +362,7 @@ export async function getMyDoctor() {
 export async function setMyDoctor(doctor) {
   await setItemEncrypted(KEYS.MY_DOCTOR, doctor);
   if (await isFB()) {
-    await firebase.fbSetMyDoctor(getUid(), doctor);
+    await supabase.fbSetMyDoctor(getUid(), doctor);
   } else if (!doctor) {
     await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
   }
@@ -401,7 +401,7 @@ export async function addConditionPrescriptions(condition) {
     existing.push(rx);
     created.push(rx);
     if (await isFB()) {
-      await firebase.fbSavePrescription(getUid(), rx);
+      await supabase.fbSavePrescription(getUid(), rx);
     }
   }
   await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
@@ -414,13 +414,13 @@ export async function saveSchedule(schedule) {
   schedules.push({ ...schedule, id: schedule.id || Date.now().toString() });
   await setItemEncrypted(KEYS.SCHEDULES, schedules);
   if (await isFB()) {
-    await firebase.fbSaveSchedule(getUid(), schedule);
+    await supabase.fbSaveSchedule(getUid(), schedule);
   }
 }
 
 export async function getSchedules() {
   if (await isFB()) {
-    const data = await firebase.fbGetSchedules(getUid());
+    const data = await supabase.fbGetSchedules(getUid());
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.SCHEDULES)) || [];

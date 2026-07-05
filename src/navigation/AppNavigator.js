@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { HighContrastProvider } from '../utils/HighContrastContext';
 import { useTheme } from '../utils/ThemeContext';
 import { COLORS, RADIUS, FONT } from '../utils/constants';
-import { isConfigured as fbConfigured, onAuthChanged, logoutUser as fbLogout } from '../utils/firebase';
+import { isConfigured as sbConfigured, onAuthChanged, logoutUser as sbLogout } from '../utils/supabase';
 import LandingScreen from '../screens/LandingScreen';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -114,7 +114,7 @@ export default function AppNavigator() {
   const { COLORS: themeColors } = useTheme();
 
   useEffect(() => {
-    if (fbConfigured()) {
+    if (sbConfigured()) {
       const unsub = onAuthChanged(user => {
         if (user) {
           setAuthenticated(true);
@@ -135,7 +135,7 @@ export default function AppNavigator() {
   }
 
   async function handleLogout() {
-    if (fbConfigured()) await fbLogout();
+    if (sbConfigured()) await sbLogout();
     setAuthenticated(false);
     setUserRole('patient');
   }

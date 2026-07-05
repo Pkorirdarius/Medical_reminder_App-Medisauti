@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, saveUser, clearAllData } from '../utils/storage';
-import { isConfigured as fbConfigured, updateUserPassword as fbUpdatePin } from '../utils/firebase';
+import { isConfigured as sbConfigured, updateUserPassword as sbUpdatePin } from '../utils/supabase';
 import { cancelAllReminders } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
