@@ -232,7 +232,10 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           return;
         }
         if (user.pin !== loginPin) {
-          Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+          Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
+            { text: t('forgot_pin'), onPress: startReset },
+            { text: 'OK' },
+          ]);
           return;
         }
         onAuthSuccess(user.role || 'patient');
@@ -240,7 +243,10 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
       if (msg.includes('invalid login') || msg.includes('credentials') || msg.includes('wrong password')) {
-        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+        Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
+          { text: t('forgot_pin'), onPress: startReset },
+          { text: 'OK' },
+        ]);
       } else {
         Alert.alert('Error', e.message);
       }

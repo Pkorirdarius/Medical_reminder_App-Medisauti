@@ -30,6 +30,14 @@ function inferCondition(drugName) {
   return 'other';
 }
 
+function conditionQueryToKey(query) {
+  const q = query.toLowerCase();
+  if (q.includes('kisukari') || q.includes('diabetes')) return 'diabetes';
+  if (q.includes('shinikizo') || q.includes('damu') || q.includes('blood') || q.includes('pressure') || q === 'bp') return 'bp';
+  if (q.includes('hiv') || q.includes('vvu')) return 'hiv';
+  return null;
+}
+
 const CONDITION_ICONS_MAP = {
   diabetes: 'water',
   bp: 'heart-pulse',
@@ -73,8 +81,13 @@ export default function PatientSearchScreen() {
     for (const rx of prescriptions) {
       const cond = inferCondition(rx.drugName);
       if (activeFilter !== 'all' && cond !== activeFilter) continue;
-      if (query && !rx.drugName.toLowerCase().includes(query) &&
-          !cond.includes(query)) continue;
+      if (query) {
+        const drugMatch = rx.drugName.toLowerCase().includes(query);
+        const condKeyMatch = cond.includes(query);
+        const queryCondKey = conditionQueryToKey(query);
+        const condNameMatch = queryCondKey && cond === queryCondKey;
+        if (!drugMatch && !condKeyMatch && !condNameMatch) continue;
+      }
       groups[cond].push(rx);
     }
     return groups;

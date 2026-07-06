@@ -387,29 +387,51 @@ const CONDITION_PRESETS = {
   ],
 };
 
-export async function addConditionPrescriptions(condition) {
+function generateSystemPrescriptions(condition) {
   const c = condition.toLowerCase();
-  let presets = [];
-  if (c.includes('kisukari') || c.includes('diabetes')) presets = CONDITION_PRESETS.diabetes;
-  else if (c.includes('shinikizo') || c.includes('blood pressure') || c.includes('bp') || c.includes('damu')) presets = CONDITION_PRESETS.bp;
-  else if (c.includes('hiv') || c.includes('vvu')) presets = CONDITION_PRESETS.hiv;
-  if (presets.length === 0) return [];
-  const created = [];
-  for (const preset of presets) {
-    const rx = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
-      ...preset,
-      createdAt: new Date().toISOString(),
-      active: true,
-      notifIds: [],
-    };
-    created.push(rx);
-    if (await isFB()) {
-      await supabase.fbSavePrescription(getUid(), rx);
-    }
+  const parts = c.split(',').map(s => s.trim()).filter(Boolean);
+  let allPresets = [];
+  for (const cond of parts) {
+    if (cond.includes('kisukari') || cond.includes('diabetes')) allPresets.push(...CONDITION_PRESETS.diabetes);
+    if (cond.includes('shinikizo') || cond.includes('blood pressure') || cond.includes('bp') || cond.includes('damu')) allPresets.push(...CONDITION_PRESETS.bp);
+    if (cond.includes('hiv') || cond.includes('vvu')) allPresets.push(...CONDITION_PRESETS.hiv);
+  }
+  if (allPresets.length === 0) return [];
+  const seen = new Set();
+  const deduped = [];
+  for (const preset of allPresets) {
+    const key = `${preset.drugName}|${preset.dosage}`;
+    if (!seen.has(key)) { seen.add(key); deduped.push(preset); }
+  }
+  return deduped.map(preset => ({
+    id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
+    ...preset,
+    createdAt: new Date().toISOString(),
+    active: true,
+    notifIds: [],
+  }));
+}
+
+export async function addConditionPrescriptions(condition) {
+  const created = generateSystemPrescriptions(condition);
+  if (created.length === 0) return [];
+  for (const rx of created) {
+    if (await isFB()) await supabase.fbSavePrescription(getUid(), rx);
   }
   await setItemEncrypted(KEYS.PRESCRIPTIONS, created);
   return created;
+}
+
+export async function syncConditionPrescriptions(condition) {
+  const existing = await getPrescriptions();
+  const manual = existing.filter(rx => rx.source !== 'system');
+  const newSystem = generateSystemPrescriptions(condition);
+  const merged = [...manual, ...newSystem];
+  await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
+  if (await isFB()) {
+    for (const rx of newSystem) await supabase.fbSavePrescription(getUid(), rx);
+  }
+  return newSystem;
 }
 
 // ── Schedules ───────────────────────────────────────────────────────

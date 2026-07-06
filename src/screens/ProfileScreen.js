@@ -9,9 +9,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, saveUser, clearAllData } from '../utils/storage';
+import { getUser, saveUser, clearAllData, syncConditionPrescriptions } from '../utils/storage';
 import { isConfigured as sbConfigured, updateUserPassword as sbUpdatePin } from '../utils/supabase';
-import { cancelAllReminders, requestNotificationPermission, getNotificationPermissionStatus, sendTestNotification, saveNotificationSound, getNotificationSound, SOUND_OPTIONS, speakReminder } from '../utils/reminders';
+import { cancelAllReminders, requestNotificationPermission, getNotificationPermissionStatus, sendTestNotification, saveNotificationSound, getNotificationSound, SOUND_OPTIONS, speakReminder, scheduleReminder } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -87,16 +87,29 @@ export default function ProfileScreen({ onLogout }) {
     setSaving(true);
     try {
       const existing = await getUser();
+      const oldCondition = (existing?.condition || '').trim();
+      const newCondition = condition.trim();
       await saveUser({
         ...existing,
         name: name.trim(),
         phone: phone.trim(),
         age: role === 'doctor' ? 0 : (parseInt(age.trim(), 10) || 0),
-        condition: role === 'doctor' ? '' : condition.trim(),
+        condition: role === 'doctor' ? '' : newCondition,
         specialization: role === 'doctor' ? specialization.trim() : '',
         role,
         avatar: avatarUri,
       });
+      if (role === 'patient' && oldCondition !== newCondition) {
+        const newSystem = await syncConditionPrescriptions(newCondition);
+        if (newSystem.length > 0) {
+          try { await cancelAllReminders(); } catch (_) {}
+          for (const rx of newSystem) {
+            for (const time of rx.times || []) {
+              try { await scheduleReminder(rx, time, language); } catch (_) {}
+            }
+          }
+        }
+      }
       Alert.alert(t('saved'), t('saved_profile'));
       navigation.goBack();
     } catch (e) { Alert.alert('Error', e.message); }

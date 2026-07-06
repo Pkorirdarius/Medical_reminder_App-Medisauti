@@ -91,7 +91,7 @@ const LANG = {
   placeholder_name:        { sw: 'Mf. Juma Omary', en: 'e.g. Juma Omary' },
   placeholder_phone:       { sw: 'Mf. 0712345678', en: 'e.g. 0712345678' },
   placeholder_age:         { sw: 'Mf. 30', en: 'e.g. 30' },
-  placeholder_condition:   { sw: 'Mf. Kisukari', en: 'e.g. Diabetes' },
+  placeholder_condition:   { sw: 'Mf. Kisukari, Shinikizo la damu (tumia koma)', en: 'e.g. Diabetes, Blood Pressure (use comma)' },
 
   // ── Home Screen ──────────────────────────────────────────────
   greeting_morning:        { sw: 'Habari za asubuhi', en: 'Good morning' },
