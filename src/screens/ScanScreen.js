@@ -21,10 +21,12 @@ export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const [user, setUser] = useState({ name: 'User' });
+  const cameraRef = useRef(null);
+  const [user, setUser]           = useState({ name: 'User' });
   const [hasPermission, setHasPermission] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
+  const [torchOn, setTorchOn] = useState(false);
   const { language, toggleLanguage, t } = useLanguage();
   const { COLORS } = useTheme();
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
@@ -52,26 +54,41 @@ export default function ScanScreen() {
   }, []));
 
   async function handleScan() {
+    if (!cameraRef.current) {
+      Alert.alert(t('error'), 'Camera not ready');
+      return;
+    }
     setScanning(true);
-    setTimeout(() => {
+    try {
+      const result = await cameraRef.current.takePictureAsync({ quality: 0.8, base64: true });
+      navigation.navigate('PrescriptionForm', { scanImage: result.base64, source: 'scan' });
+    } catch (e) {
+      Alert.alert(t('error'), e.message);
+    } finally {
       setScanning(false);
-      navigation.navigate('Dawa', { screen: 'PrescriptionForm', params: { source: 'scan' } });
-    }, 2000);
+    }
   }
 
   async function handlePickImage() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images });
-    if (!result.canceled) {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert(t('permission_title'), t('permission_desc'));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      base64: true,
+    });
+    if (!result.canceled && result.assets?.[0]) {
       setScanning(true);
-      setTimeout(() => {
-        setScanning(false);
-        navigation.navigate('Dawa', { screen: 'PrescriptionForm', params: { source: 'scan' } });
-      }, 1500);
+      navigation.navigate('PrescriptionForm', { scanImage: result.assets[0].base64, source: 'scan' });
+      setScanning(false);
     }
   }
 
   function handleManualEntry() {
-    navigation.navigate('Dawa', { screen: 'PrescriptionForm' });
+    navigation.navigate('PrescriptionForm');
   }
 
   const avatarLetters = (user.name || 'U').slice(0, 2).toUpperCase();
@@ -112,7 +129,7 @@ export default function ScanScreen() {
         {/* ── Camera Viewfinder ── */}
         <View style={styles.viewfinder}>
           {hasPermission && !scanning ? (
-            <Camera style={styles.camera} type={Camera.Constants.Type.back} />
+            <Camera style={styles.camera} ref={cameraRef} type={Camera.Constants.Type.back} flashMode={torchOn ? Camera.Constants.FlashMode.torch : Camera.Constants.FlashMode.off} />
           ) : (
             <View style={styles.cameraPlaceholder}>
               <MaterialCommunityIcons name="camera" size={48} color={COLORS.outline} />
@@ -138,8 +155,8 @@ export default function ScanScreen() {
 
           {/* Camera Controls */}
           <View style={styles.cameraControls}>
-            <TouchableOpacity style={styles.ctrlBtn} onPress={handleScan}>
-              <MaterialCommunityIcons name="flashlight" size={22} color="#fff" />
+            <TouchableOpacity style={styles.ctrlBtn} onPress={() => setTorchOn(p => !p)}>
+              <MaterialCommunityIcons name={torchOn ? 'flashlight' : 'flashlight-off'} size={22} color="#fff" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.shutterBtn} onPress={handleScan}>
               <View style={styles.shutterInner} />

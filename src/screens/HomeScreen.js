@@ -110,7 +110,10 @@ export default function HomeScreen() {
         notifPermissionChecked.current = true;
         const granted = await requestNotificationPermission();
         if (!granted) {
-          Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
+          Alert.alert(t('notif_permission_title'), t('notif_permission_denied'), [
+            { text: t('ok') },
+            { text: t('enable'), onPress: () => requestNotificationPermission() },
+          ]);
         }
       }
     } catch (e) { console.error(e); }

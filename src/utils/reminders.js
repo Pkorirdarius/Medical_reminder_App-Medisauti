@@ -1,10 +1,27 @@
 import * as Notifications from 'expo-notifications';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const NOTIF_SOUND_KEY = 'medisauti:notifSound';
+const DEFAULT_SOUND = 'default';
+
+export const SOUND_OPTIONS = [
+  { key: 'default',   sw: 'Sauti ya kawaida',   en: 'Default' },
+  { key: 'none',      sw: 'Hakuna sauti',        en: 'None' },
+];
 
 // ─── Notification Setup ──────────────────────────────────────────────
 export async function requestNotificationPermission() {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  if (existing === 'granted') return true;
   const { status } = await Notifications.requestPermissionsAsync();
   return status === 'granted';
+}
+
+export async function getNotificationPermissionStatus() {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status;
 }
 
 Notifications.setNotificationHandler({
@@ -14,6 +31,25 @@ Notifications.setNotificationHandler({
     shouldSetBadge:  true,
   }),
 });
+
+// ─── Notification Sound Preferences ──────────────────────────────────
+export async function saveNotificationSound(soundKey) {
+  await AsyncStorage.setItem(NOTIF_SOUND_KEY, soundKey);
+  if (Platform.OS === 'android') {
+    const soundName = soundKey === 'none' ? null : soundKey === 'default' ? null : soundKey;
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: soundName,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  }
+}
+
+export async function getNotificationSound() {
+  const saved = await AsyncStorage.getItem(NOTIF_SOUND_KEY);
+  return saved || DEFAULT_SOUND;
+}
 
 /**
  * Normalize a time string to HH:MM format.
@@ -47,6 +83,11 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
   const title =
     language === 'sw' ? 'Dawa - Kikumbusho' : 'Medication Reminder';
 
+  const savedSound = await getNotificationSound();
+  const soundValue = savedSound === 'none' ? undefined : savedSound === 'default' ? true : savedSound;
+
+  const channel = Platform.OS === 'android' ? 'default' : undefined;
+
   const notifId = await Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -56,12 +97,13 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
         scheduledTime:  time,
         action:         'reminder',
       },
-      sound: true,
+      sound: soundValue,
     },
     trigger: {
       hour,
       minute,
       repeats: true,
+      channel,
     },
   });
 
@@ -131,4 +173,24 @@ export function formatTime12(time24) {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const hour = h % 12 || 12;
   return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+// ─── Test Notification ──────────────────────────────────────────────
+export async function sendTestNotification(language = 'sw', drugName = 'Test', dosage = '500mg') {
+  const title = language === 'sw' ? 'Dawa - Jaribio la Kikumbusho' : 'Medication Reminder - Test';
+  const body = language === 'sw'
+    ? `Huu ni jaribio la kikumbusho cha ${drugName} ${dosage}`
+    : `This is a test reminder for ${drugName} ${dosage}`;
+
+  const savedSound = await getNotificationSound();
+  const soundValue = savedSound === 'none' ? undefined : savedSound === 'default' ? true : savedSound;
+
+  const notifId = await Notifications.scheduleNotificationAsync({
+    content: { title, body, data: { action: 'test' }, sound: soundValue },
+    trigger: null,
+  });
+
+  speakReminder(drugName, dosage, 'sasa', language);
+
+  return notifId;
 }

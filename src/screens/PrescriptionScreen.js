@@ -27,7 +27,7 @@ const INITIAL_FORM = {
 
 
 
-export default function PrescriptionScreen() {
+export default function PrescriptionScreen({ route }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { toggleHighContrast } = useHighContrast();
@@ -83,7 +83,15 @@ export default function PrescriptionScreen() {
     );
   }
 
-  useFocusEffect(useCallback(() => { loadData(); }, []));
+  useFocusEffect(useCallback(() => {
+    loadData();
+    const scanImage = route?.params?.scanImage;
+    if (scanImage && !ocrBusy) {
+      startOCR(scanImage);
+      navigation.setParams({ scanImage: undefined });
+    }
+  }, [route?.params?.scanImage]));
+
   useFocusEffect(useCallback(() => {
     if (scrollRef.current) setTimeout(() => scrollRef.current?.scrollTo?.({ y: 0, animated: true }), 100);
   }, []));
@@ -174,14 +182,14 @@ export default function PrescriptionScreen() {
     setOcrProgress(95);
     let parsed = null;
     if (rawText.length > 5) {
-      if (!hasProvider()) {
-        Alert.alert(t('ocr_ai_title'), t('ocr_ai_no_key'));
+      if (hasProvider()) {
+        parsed = await parseWithAI(rawText);
+        if (parsed) setOcrMode('ai');
+      } else {
+        console.log('No AI provider configured, using regex fallback');
       }
-      parsed = await parseWithAI(rawText);
     }
-    if (parsed) {
-      setOcrMode('ai');
-    } else {
+    if (!parsed) {
       setOcrMode('regex');
       parsed = parseOCRText(rawText);
     }
@@ -444,9 +452,12 @@ export default function PrescriptionScreen() {
         ref={webviewRef}
         source={{ html: OCR_WEBVIEW_HTML }}
         onMessage={handleOCRMessage}
-        style={{ height: 0, width: 0, opacity: 0 }}
+        style={{ height: 1, width: 1, opacity: 0.01, position: 'absolute', top: -999, left: -999 }}
         javaScriptEnabled
         domStorageEnabled
+        allowFileAccess
+        allowContentAccess
+        mixedContentMode="always"
       />
 
       {/* OCR Loading Overlay */}

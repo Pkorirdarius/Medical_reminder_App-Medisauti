@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Image,
+  TextInput, Alert, ActivityIndicator, Image, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, saveUser, clearAllData } from '../utils/storage';
 import { isConfigured as sbConfigured, updateUserPassword as sbUpdatePin } from '../utils/supabase';
-import { cancelAllReminders } from '../utils/reminders';
+import { cancelAllReminders, requestNotificationPermission, getNotificationPermissionStatus, sendTestNotification, saveNotificationSound, getNotificationSound, SOUND_OPTIONS, speakReminder } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -28,6 +28,10 @@ export default function ProfileScreen({ onLogout }) {
   const [avatarUri, setAvatarUri] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [notifPermission, setNotifPermission] = useState('undetermined');
+  const [notifSound, setNotifSound] = useState('default');
+  const [testingNotif, setTestingNotif] = useState(false);
+  const [showSoundPicker, setShowSoundPicker] = useState(false);
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   useFocusEffect(useCallback(() => {
@@ -36,7 +40,11 @@ export default function ProfileScreen({ onLogout }) {
 
   async function loadProfile() {
     try {
-      const u = await getUser();
+      const [u, permStatus, sound] = await Promise.all([
+        getUser(),
+        getNotificationPermissionStatus(),
+        getNotificationSound(),
+      ]);
       if (u) {
         setName(u.name || '');
         setPhone(u.phone || '');
@@ -44,6 +52,8 @@ export default function ProfileScreen({ onLogout }) {
         setCondition(u.condition || '');
         setAvatarUri(u.avatar || null);
       }
+      setNotifPermission(permStatus);
+      setNotifSound(sound);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
@@ -85,6 +95,40 @@ export default function ProfileScreen({ onLogout }) {
       navigation.goBack();
     } catch (e) { Alert.alert('Error', e.message); }
     finally { setSaving(false); }
+  }
+
+  async function handleRequestNotifPermission() {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      setNotifPermission('granted');
+      Alert.alert(t('success'), t('notif_permission_granted'));
+    } else {
+      setNotifPermission('denied');
+      Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
+    }
+  }
+
+  async function handleTestNotification() {
+    setTestingNotif(true);
+    try {
+      const perm = await getNotificationPermissionStatus();
+      if (perm !== 'granted') {
+        Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
+        return;
+      }
+      await sendTestNotification(language, 'Paracetamol', '500mg');
+      Alert.alert(t('test_notif_sent_title'), t('test_notif_sent_body'));
+    } catch (e) {
+      Alert.alert(t('error'), e.message);
+    } finally {
+      setTestingNotif(false);
+    }
+  }
+
+  async function handleSoundSelect(soundKey) {
+    setNotifSound(soundKey);
+    setShowSoundPicker(false);
+    await saveNotificationSound(soundKey);
   }
 
   function handleLogout() {
@@ -212,6 +256,94 @@ export default function ProfileScreen({ onLogout }) {
                   />
                 </TouchableOpacity>
               </View>
+
+              {/* ── Notifications ── */}
+              <View style={[styles.formCard, { marginTop: 8 }]}>
+                <Text style={[styles.fieldLabel, { marginBottom: 4 }]}>{t('notif_settings')}</Text>
+
+                {/* Permission */}
+                <View style={styles.toggleRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <MaterialCommunityIcons
+                      name={notifPermission === 'granted' ? 'bell-ring' : 'bell-off-outline'}
+                      size={22}
+                      color={notifPermission === 'granted' ? COLORS.primary : COLORS.outline}
+                    />
+                    <View>
+                      <Text style={styles.toggleLabel}>{t('notif_permission')}</Text>
+                      <Text style={styles.toggleHint}>
+                        {notifPermission === 'granted' ? t('notif_permission_granted') : notifPermission === 'denied' ? t('notif_permission_denied') : t('notif_permission_request')}
+                      </Text>
+                    </View>
+                  </View>
+                  {notifPermission !== 'granted' && (
+                    <TouchableOpacity style={[styles.smallBtn, { backgroundColor: COLORS.primary }]} onPress={handleRequestNotifPermission}>
+                      <Text style={styles.smallBtnText}>{t('enable')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <View style={[styles.divider, { backgroundColor: COLORS.surfaceHigh }]} />
+
+                {/* Sound */}
+                <TouchableOpacity style={styles.toggleRow} onPress={() => setShowSoundPicker(true)} activeOpacity={0.6}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <MaterialCommunityIcons name="volume-high" size={22} color={COLORS.primary} />
+                    <View>
+                      <Text style={styles.toggleLabel}>{t('notif_sound')}</Text>
+                      <Text style={styles.toggleHint}>
+                        {SOUND_OPTIONS.find(s => s.key === notifSound)?.[language === 'sw' ? 'sw' : 'en'] || 'Default'}
+                      </Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.outline} />
+                </TouchableOpacity>
+
+                <View style={[styles.divider, { backgroundColor: COLORS.surfaceHigh }]} />
+
+                {/* Test */}
+                <TouchableOpacity style={styles.toggleRow} onPress={handleTestNotification} disabled={testingNotif} activeOpacity={0.6}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                    <MaterialCommunityIcons name="volume-high" size={22} color={COLORS.warning} />
+                    <View>
+                      <Text style={styles.toggleLabel}>{t('test_notif')}</Text>
+                      <Text style={styles.toggleHint}>{t('test_notif_desc')}</Text>
+                    </View>
+                  </View>
+                  {testingNotif ? (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  ) : (
+                    <MaterialCommunityIcons name="play-circle" size={28} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* ── Sound Picker Modal ── */}
+              <Modal visible={showSoundPicker} animationType="fade" transparent>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowSoundPicker(false)}>
+                  <View style={styles.soundPickerCard}>
+                    <Text style={styles.soundPickerTitle}>{t('notif_sound')}</Text>
+                    {SOUND_OPTIONS.map(opt => {
+                      const active = notifSound === opt.key;
+                      return (
+                        <TouchableOpacity key={opt.key} style={[styles.soundPickerRow, active && styles.soundPickerRowActive]} onPress={() => handleSoundSelect(opt.key)}>
+                          <MaterialCommunityIcons
+                            name={active ? 'radiobox-marked' : 'radiobox-blank'}
+                            size={20}
+                            color={active ? COLORS.primary : COLORS.outline}
+                          />
+                          <Text style={[styles.soundPickerLabel, active && { color: COLORS.primary, fontFamily: FONT.bodySemiBold }]}>
+                            {opt[language === 'sw' ? 'sw' : 'en']}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity style={styles.soundPickerDone} onPress={() => setShowSoundPicker(false)}>
+                      <Text style={styles.soundPickerDoneText}>{t('done')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
 
               {/* ── Logout ── */}
               <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
@@ -409,6 +541,66 @@ function getStyles(C) {
       fontSize: 15,
       fontFamily: FONT.bodySemiBold,
       color: C.red[400],
+    },
+
+    smallBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: RADIUS.md,
+    },
+    smallBtnText: {
+      fontSize: 12,
+      fontFamily: FONT.bodySemiBold,
+      color: '#fff',
+    },
+
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    soundPickerCard: {
+      backgroundColor: C.surfaceLowest,
+      borderRadius: RADIUS.xl,
+      padding: 24,
+      width: '80%',
+      maxWidth: 320,
+      gap: 4,
+    },
+    soundPickerTitle: {
+      fontSize: 16,
+      fontFamily: FONT.bold,
+      color: C.onSurface,
+      marginBottom: 12,
+    },
+    soundPickerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      borderRadius: RADIUS.md,
+    },
+    soundPickerRowActive: {
+      backgroundColor: C.primary + '12',
+    },
+    soundPickerLabel: {
+      fontSize: 15,
+      fontFamily: FONT.body,
+      color: C.onSurface,
+    },
+    soundPickerDone: {
+      marginTop: 12,
+      alignItems: 'center',
+      paddingVertical: 12,
+      backgroundColor: C.primary,
+      borderRadius: RADIUS.md,
+    },
+    soundPickerDoneText: {
+      fontSize: 15,
+      fontFamily: FONT.bodySemiBold,
+      color: '#fff',
     },
   });
 }

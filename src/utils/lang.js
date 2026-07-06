@@ -9,6 +9,7 @@ const LANG = {
   delete:           { sw: 'Futa', en: 'Delete' },
   yes:              { sw: 'Ndiyo', en: 'Yes' },
   no:               { sw: 'Hapana', en: 'No' },
+  ok:               { sw: 'Sawa', en: 'OK' },
   loading:          { sw: 'Inapakia...', en: 'Loading...' },
   swahili:          { sw: 'Kiswahili', en: 'Swahili' },
   english:          { sw: 'Kiingereza', en: 'English' },
@@ -268,6 +269,18 @@ const LANG = {
   light_mode:              { sw: 'Hali ya mwanga', en: 'Light mode' },
   appearance:              { sw: 'Mwonekano', en: 'Appearance' },
   language:                { sw: 'Lugha', en: 'Language' },
+
+  // ── Notifications & Sound ────────────────────────────────────
+  notif_settings:        { sw: 'Arifa na Sauti', en: 'Notifications & Sound' },
+  notif_permission:      { sw: 'Ruhusa ya arifa', en: 'Notification permission' },
+  notif_permission_request: { sw: 'Bonyeza kuwezesha', en: 'Tap to enable' },
+  notif_sound:           { sw: 'Sauti ya arifa', en: 'Notification sound' },
+  enable:                { sw: 'Washa', en: 'Enable' },
+  done:                  { sw: 'Imekamilika', en: 'Done' },
+  test_notif:            { sw: 'Jaribu arifa', en: 'Test notification' },
+  test_notif_desc:       { sw: 'Tuma arifa ya majaribio na sauti', en: 'Send a test notification with voice' },
+  test_notif_sent_title: { sw: 'Jaribio limetumwa', en: 'Test sent' },
+  test_notif_sent_body:  { sw: 'Angalia arifa na usikilize sauti ya kikumbusho.', en: 'Check the notification and listen for the voice reminder.' },
 
   // ── Duration ─────────────────────────────────────────────────
   label_duration:          { sw: 'Muda wa matumizi', en: 'Duration' },
