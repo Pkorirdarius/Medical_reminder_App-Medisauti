@@ -8,8 +8,9 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
-import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
+import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors, clearUserData } from '../utils/storage';
 import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient } from '../utils/supabase';
+import { scheduleReminder, cancelAllReminders } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -173,17 +174,26 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         biometricEnabled: optInBio,
       };
 
+      let sbUid = null;
       if (sbConfigured()) {
-        await sbRegister(phone.trim(), pin, user);
+        sbUid = await sbRegister(phone.trim(), pin, user);
       }
+      if (sbUid) user.uid = sbUid;
       await saveUser(user);
 
       if (role === 'doctor') {
         await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
         Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       } else {
+        await clearUserData();
         const added = await addConditionPrescriptions(user.condition);
         if (added.length > 0) {
+          try { await cancelAllReminders(); } catch (_) {}
+          for (const rx of added) {
+            for (const time of rx.times || []) {
+              try { await scheduleReminder(rx, time, language); } catch (_) {}
+            }
+          }
           Alert.alert(t('auto_added_title'), t('auto_added_body').replace('{condition}', user.condition));
         } else {
           Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
@@ -202,10 +212,16 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     try {
       if (sbConfigured()) {
         const uid = await sbLogin(loginPhone, loginPin);
-        const remoteUser = await getUser();
+        let remoteUser = await getUser();
         if (!remoteUser) {
-          Alert.alert(t('error'), t('no_account_found'));
-          return;
+          const sbClient = getSupabaseClient();
+          if (sbClient) {
+            const { data } = await sbClient.from('users').select('*').eq('id', uid).maybeSingle();
+            if (data) remoteUser = { uid, ...data.data, phone: data.phone };
+          }
+        }
+        if (!remoteUser) {
+          remoteUser = { uid, phone: loginPhone, pin: loginPin, role: 'patient', name: loginPhone, createdAt: new Date().toISOString() };
         }
         await saveUser(remoteUser);
         onAuthSuccess(remoteUser.role || 'patient');
@@ -221,7 +237,14 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         }
         onAuthSuccess(user.role || 'patient');
       }
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) {
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('invalid login') || msg.includes('credentials') || msg.includes('wrong password')) {
+        Alert.alert(t('wrong_pin'), t('wrong_pin_body'));
+      } else {
+        Alert.alert('Error', e.message);
+      }
+    }
   }
 
   // ── Forgot PIN ──────────────────────────────────────────────────

@@ -91,7 +91,7 @@ async function getItemDecrypted(key) {
 // ── Firebase helpers ───────────────────────────────────────────────
 function getUid() {
   const u = supabase.getCurrentUser();
-  return u?.uid || null;
+  return u?.id || u?.uid || null;
 }
 
 async function isFB() {
@@ -376,12 +376,14 @@ export async function setMyDoctor(doctor) {
 const CONDITION_PRESETS = {
   diabetes: [
     { drugName: 'Metformin', dosage: '500mg', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
+    { drugName: 'Insulin Glargine (Lantus)', dosage: 'Vitengo 10', frequency: 'Mara moja kwa siku', times: ['21:00'], notes: 'Kabla ya kulala — sindano chini ya ngozi', source: 'system', voiceNotif: true },
   ],
   bp: [
     { drugName: 'Amlodipine', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
+    { drugName: 'Enalapril', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi pamoja na Amlodipine', source: 'system', voiceNotif: true },
   ],
   hiv: [
-    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala', source: 'system', voiceNotif: true },
+    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala — usikose dozi', source: 'system', voiceNotif: true },
   ],
 };
 
@@ -392,7 +394,6 @@ export async function addConditionPrescriptions(condition) {
   else if (c.includes('shinikizo') || c.includes('blood pressure') || c.includes('bp') || c.includes('damu')) presets = CONDITION_PRESETS.bp;
   else if (c.includes('hiv') || c.includes('vvu')) presets = CONDITION_PRESETS.hiv;
   if (presets.length === 0) return [];
-  const existing = await getPrescriptions();
   const created = [];
   for (const preset of presets) {
     const rx = {
@@ -402,13 +403,12 @@ export async function addConditionPrescriptions(condition) {
       active: true,
       notifIds: [],
     };
-    existing.push(rx);
     created.push(rx);
     if (await isFB()) {
       await supabase.fbSavePrescription(getUid(), rx);
     }
   }
-  await setItemEncrypted(KEYS.PRESCRIPTIONS, existing);
+  await setItemEncrypted(KEYS.PRESCRIPTIONS, created);
   return created;
 }
 
@@ -434,4 +434,14 @@ export async function getSchedules() {
 export async function clearAllData() {
   const keys = Object.values(KEYS);
   await AsyncStorage.multiRemove(keys);
+}
+
+// ── Clear user-specific data (prescriptions, logs, schedules) ─────
+export async function clearUserData() {
+  await AsyncStorage.multiRemove([
+    KEYS.PRESCRIPTIONS,
+    KEYS.ADHERENCE,
+    KEYS.SCHEDULES,
+    KEYS.MY_DOCTOR,
+  ]);
 }

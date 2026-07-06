@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator, Animated, RefreshControl, Dimensions, Alert,
+  Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const [refreshing, setRef]     = useState(false);
   const [myDoctor, setMyDoc]     = useState(null);
   const [doctorsList, setDoctors] = useState([]);
+  const [showDoctorModal, setShowDoctorModal] = useState(false);
   const notifPermissionChecked = useRef(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -150,21 +152,13 @@ export default function HomeScreen() {
       Alert.alert(t('select_doctor'), t('no_doctors_available'));
       return;
     }
-    if (doctorsList.length <= 2) {
-      const buttons = doctorsList.map(d => ({
-        text: `${d.name} — ${d.specialization || t('role_doctor')}`,
-        onPress: () => { setMyDoc(d); setMyDoctor(d); },
-      }));
-      buttons.push({ text: t('cancel'), style: 'cancel' });
-      Alert.alert(t('select_doctor'), '', buttons);
-    } else {
-      const names = doctorsList.map((d, i) => `${i + 1}. ${d.name} (${d.specialization || t('role_doctor')})`).join('\n');
-      Alert.alert(t('select_doctor'), names + '\n\n' + t('change_doctor'), [
-        { text: doctorsList[0].name, onPress: () => { setMyDoc(doctorsList[0]); setMyDoctor(doctorsList[0]); } },
-        { text: doctorsList[1].name, onPress: () => { setMyDoc(doctorsList[1]); setMyDoctor(doctorsList[1]); } },
-        { text: t('cancel'), style: 'cancel' },
-      ]);
-    }
+    setShowDoctorModal(true);
+  }
+
+  function selectDoctor(d) {
+    setMyDoc(d);
+    setMyDoctor(d);
+    setShowDoctorModal(false);
   }
 
   const greeting = () => {
@@ -369,6 +363,41 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* ── Doctor Selection Modal ── */}
+      <Modal visible={showDoctorModal} transparent animationType="fade" onRequestClose={() => setShowDoctorModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <MaterialCommunityIcons name="stethoscope" size={22} color={COLORS.primary} />
+              <Text style={styles.modalTitle}>{t('select_doctor')}</Text>
+            </View>
+
+            <FlatList
+              data={doctorsList}
+              keyExtractor={(_, i) => String(i)}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.doctorRow} onPress={() => selectDoctor(item)} activeOpacity={0.6}>
+                  <View style={styles.doctorRowIcon}>
+                    <MaterialCommunityIcons name="account-circle" size={36} color={COLORS.blue[800]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.doctorRowName}>{item.name}</Text>
+                    <Text style={styles.doctorRowSpec}>{item.specialization || t('role_doctor')}</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.outline} />
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.modalSeparator} />}
+              style={{ maxHeight: 320 }}
+            />
+
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setShowDoctorModal(false)} activeOpacity={0.6}>
+              <Text style={styles.modalCancelText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -490,5 +519,50 @@ function getStyles(C) {
     /* ── Empty State ── */
     emptyState:     { alignItems: 'center', paddingVertical: 24 },
     emptyText:      { fontSize: 13, fontFamily: FONT.body, color: C.outline, lineHeight: 22, textAlign: 'center', marginTop: 12 },
+
+    /* ── Doctor Modal ── */
+    modalOverlay: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center', alignItems: 'center',
+      padding: 32,
+    },
+    modalCard: {
+      width: '100%', backgroundColor: C.surfaceLowest,
+      borderRadius: RADIUS.xxl, overflow: 'hidden',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2, shadowRadius: 24, elevation: 12,
+    },
+    modalHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      padding: 20, paddingBottom: 12,
+      borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh,
+    },
+    modalTitle: {
+      fontSize: 17, fontFamily: FONT.bold, color: C.onSurface,
+    },
+    doctorRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingVertical: 14, paddingHorizontal: 20,
+    },
+    doctorRowIcon: {
+      width: 44, height: 44, borderRadius: 12,
+      backgroundColor: C.blue[50], alignItems: 'center', justifyContent: 'center',
+    },
+    doctorRowName: {
+      fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.onSurface,
+    },
+    doctorRowSpec: {
+      fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 1,
+    },
+    modalSeparator: {
+      height: 0.5, backgroundColor: C.surfaceHigh, marginHorizontal: 20,
+    },
+    modalCancel: {
+      padding: 16, alignItems: 'center',
+      borderTopWidth: 0.5, borderTopColor: C.surfaceHigh,
+    },
+    modalCancelText: {
+      fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.outline,
+    },
   });
 }
