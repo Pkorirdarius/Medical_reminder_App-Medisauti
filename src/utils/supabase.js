@@ -49,23 +49,31 @@ function getCurrentUser() {
   return supabase?.auth?.currentUser || null;
 }
 
+function getClient() {
+  return supabase;
+}
+
 async function registerUser(phone, pin, userData) {
   const email = makeEmail(phone);
   const password = makePassword(pin);
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   const uid = data.user.id;
-  await supabase.from('users').insert({
-    id: uid,
-    phone,
-    data: {
-      ...userData,
+  try {
+    await supabase.from('users').insert({
+      id: uid,
       phone,
-      pin,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  });
+      data: {
+        ...userData,
+        phone,
+        pin,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (e) {
+    console.warn('users table insert failed — using local storage fallback:', e.message);
+  }
   return uid;
 }
 
@@ -252,7 +260,7 @@ async function fbDeleteAllUserData(uid) {
 
 export {
   isConfigured, init,
-  getAuthInstance, getCurrentUser, registerUser, loginUser, logoutUser, onAuthChanged, updateUserPassword,
+  getAuthInstance, getCurrentUser, getClient, registerUser, loginUser, logoutUser, onAuthChanged, updateUserPassword,
   fbGetUser, fbSaveUser,
   fbGetPrescriptions, fbSavePrescription, fbDeletePrescription,
   fbGetLogs, fbLogDose,

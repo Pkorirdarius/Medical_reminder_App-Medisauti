@@ -115,12 +115,14 @@ export default function AppNavigator() {
 
   useEffect(() => {
     if (sbConfigured()) {
-      const unsub = onAuthChanged(user => {
+      const unsub = onAuthChanged(async user => {
         if (user) {
-          setAuthenticated(true);
-          import('../utils/storage').then(({ getUser }) =>
-            getUser().then(u => setUserRole(u?.role || 'patient'))
-          );
+          const { getUser } = await import('../utils/storage');
+          const u = await getUser();
+          if (u) {
+            setAuthenticated(true);
+            setUserRole(u.role || 'patient');
+          }
         }
         setReady(true);
       });

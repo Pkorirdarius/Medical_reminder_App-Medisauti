@@ -86,8 +86,6 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
   const savedSound = await getNotificationSound();
   const soundValue = savedSound === 'none' ? undefined : savedSound === 'default' ? true : savedSound;
 
-  const channel = Platform.OS === 'android' ? 'default' : undefined;
-
   const notifId = await Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -100,10 +98,9 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
       sound: soundValue,
     },
     trigger: {
+      type: 'daily',
       hour,
       minute,
-      repeats: true,
-      channel,
     },
   });
 

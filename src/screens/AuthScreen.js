@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
 import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors } from '../utils/storage';
-import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin } from '../utils/supabase';
+import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient } from '../utils/supabase';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -41,6 +41,14 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const { COLORS } = useTheme();
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
   const [registering, setRegistering] = useState(false);
+  const [resetMode, setResetMode] = useState('');
+  const [resetPhone, setResetPhone] = useState('');
+  const [generatedCode, setGeneratedCode] = useState('');
+  const [codeInput, setCodeInput] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [newConfirmPin, setNewConfirmPin] = useState('');
+  const [resetUid, setResetUid] = useState(null);
+  const [resetting, setResetting] = useState(false);
 
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -167,9 +175,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
 
       if (sbConfigured()) {
         await sbRegister(phone.trim(), pin, user);
-      } else {
-        await saveUser(user);
       }
+      await saveUser(user);
 
       if (role === 'doctor') {
         await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
@@ -200,6 +207,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           Alert.alert(t('error'), t('no_account_found'));
           return;
         }
+        await saveUser(remoteUser);
         onAuthSuccess(remoteUser.role || 'patient');
       } else {
         const user = await getUser();
@@ -214,6 +222,91 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         onAuthSuccess(user.role || 'patient');
       }
     } catch (e) { Alert.alert('Error', e.message); }
+  }
+
+  // ── Forgot PIN ──────────────────────────────────────────────────
+  function startReset() {
+    setResetPhone('');
+    setGeneratedCode('');
+    setCodeInput('');
+    setNewPin('');
+    setNewConfirmPin('');
+    setResetUid(null);
+    setResetMode('phone');
+  }
+
+  async function handleResetPhone() {
+    if (!resetPhone.trim()) {
+      Alert.alert(t('error'), t('fill_all_fields'));
+      return;
+    }
+    setResetting(true);
+    try {
+      let foundUser = null;
+      const sbClient = getSupabaseClient();
+      if (sbConfigured() && sbClient) {
+        const { data } = await sbClient
+          .from('users')
+          .select('*')
+          .eq('phone', resetPhone.trim())
+          .maybeSingle();
+        if (data) {
+          foundUser = { uid: data.id, ...data.data, phone: data.phone };
+          setResetUid(data.id);
+        }
+      }
+      if (!foundUser) {
+        const localUser = await getUser();
+        if (localUser && localUser.phone === resetPhone.trim()) foundUser = localUser;
+      }
+      if (!foundUser) {
+        Alert.alert(t('forgot_pin_title'), t('forgot_pin_no_account'));
+        setResetting(false);
+        return;
+      }
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setGeneratedCode(code);
+      setResetMode('code');
+    } catch (e) { Alert.alert(t('error'), e.message); }
+    finally { setResetting(false); }
+  }
+
+  function handleResetCode() {
+    if (codeInput !== generatedCode) {
+      Alert.alert(t('forgot_pin_title'), t('forgot_pin_code_wrong'));
+      return;
+    }
+    setResetMode('newPin');
+  }
+
+  async function handleResetPin() {
+    if (newPin.length !== PIN_LENGTH || newPin !== newConfirmPin) {
+      Alert.alert(t('forgot_pin_title'), t('forgot_pin_mismatch'));
+      return;
+    }
+    setResetting(true);
+    try {
+      const localUser = await getUser();
+      const updated = { ...(localUser || {}), pin: newPin };
+      await saveUser(updated);
+      if (sbConfigured() && resetUid) {
+        const sbClient = getSupabaseClient();
+        if (sbClient) {
+          await sbClient.from('users').update({
+            data: { ...updated, updatedAt: new Date().toISOString() },
+          }).eq('id', resetUid);
+          try {
+            const { updateUserPassword } = await import('../utils/supabase');
+            await updateUserPassword(newPin, newPin);
+          } catch (_) {}
+        }
+      }
+      Alert.alert(t('success'), t('forgot_pin_success'));
+      setResetMode('');
+      setLoginPhone(resetPhone);
+      setLoginPin('');
+    } catch (e) { Alert.alert(t('error'), e.message); }
+    finally { setResetting(false); }
   }
 
   if (loading) {
@@ -311,62 +404,110 @@ export default function AuthScreen({ onAuthSuccess, route }) {
             </View>
           ) : (
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>{t('card_login_title')}</Text>
-              <Text style={styles.cardSub}>{t('card_login_subtitle')}</Text>
+              {resetMode ? (
+                <>
+                  {resetMode === 'phone' && (
+                    <>
+                      <Text style={styles.cardTitle}>{t('forgot_pin_title')}</Text>
+                      <Text style={styles.cardSub}>{t('forgot_pin_phone')}</Text>
+                      <FormInput label={t('label_phone')} value={resetPhone} onChangeText={setResetPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                      <TouchableOpacity style={styles.primaryBtn} onPress={handleResetPhone} disabled={resetting}>
+                        {resetting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('forgot_pin_next')}</Text>}
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  {resetMode === 'code' && (
+                    <>
+                      <Text style={styles.cardTitle}>{t('forgot_pin_title')}</Text>
+                      <Text style={styles.cardSub}>{t('forgot_pin_code_sent')}</Text>
+                      <View style={{ backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', marginBottom: 16 }}>
+                        <Text style={{ fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginBottom: 4 }}>{t('forgot_pin_code_hint')}</Text>
+                        <Text style={{ fontSize: 28, fontFamily: FONT.bold, color: COLORS.primary, letterSpacing: 4 }}>{generatedCode}</Text>
+                      </View>
+                      <FormInput label={t('forgot_pin_code_label')} value={codeInput} onChangeText={setCodeInput} placeholder="------" keyboardType="number-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                      <TouchableOpacity style={styles.primaryBtn} onPress={handleResetCode}>
+                        <Text style={styles.primaryBtnText}>{t('forgot_pin_next')}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  {resetMode === 'newPin' && (
+                    <>
+                      <Text style={styles.cardTitle}>{t('forgot_pin_title')}</Text>
+                      <FormInput label={t('forgot_pin_new')} value={newPin} onChangeText={v => setNewPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                      <FormInput label={t('forgot_pin_confirm')} value={newConfirmPin} onChangeText={v => setNewConfirmPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                      <TouchableOpacity style={styles.primaryBtn} onPress={handleResetPin} disabled={resetting}>
+                        {resetting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('forgot_pin_btn')}</Text>}
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  <TouchableOpacity style={styles.switchBtn} onPress={() => setResetMode('')}>
+                    <Text style={styles.switchBtnText}>{t('forgot_pin_back')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.cardTitle}>{t('card_login_title')}</Text>
+                  <Text style={styles.cardSub}>{t('card_login_subtitle')}</Text>
 
-              {/* Login Role Toggle */}
-              <View style={styles.roleRow}>
-                <Text style={styles.roleLabel}>{t('login_as')}</Text>
-                <View style={styles.roleToggle}>
-                  {['patient', 'doctor'].map(r => (
-                    <TouchableOpacity key={r} style={[styles.roleOpt, loginRole === r && styles.roleOptActive]} onPress={() => setLoginRole(r)}>
-                      <MaterialCommunityIcons
-                        name={r === 'doctor' ? 'stethoscope' : 'account'}
-                        size={14} color={loginRole === r ? '#fff' : COLORS.outline}
-                      />
-                      <Text style={[styles.roleOptText, loginRole === r && styles.roleOptTextActive]}>
-                        {r === 'doctor' ? t('role_doctor') : t('role_patient')}
+                  {/* Login Role Toggle */}
+                  <View style={styles.roleRow}>
+                    <Text style={styles.roleLabel}>{t('login_as')}</Text>
+                    <View style={styles.roleToggle}>
+                      {['patient', 'doctor'].map(r => (
+                        <TouchableOpacity key={r} style={[styles.roleOpt, loginRole === r && styles.roleOptActive]} onPress={() => setLoginRole(r)}>
+                          <MaterialCommunityIcons
+                            name={r === 'doctor' ? 'stethoscope' : 'account'}
+                            size={14} color={loginRole === r ? '#fff' : COLORS.outline}
+                          />
+                          <Text style={[styles.roleOptText, loginRole === r && styles.roleOptTextActive]}>
+                            {r === 'doctor' ? t('role_doctor') : t('role_patient')}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {biometricAvailable && (
+                    <TouchableOpacity
+                      style={[styles.biometricBtn, userBioPref && styles.biometricBtnPref]}
+                      onPress={handleBiometricLogin}
+                    >
+                      <Animated.View style={{ transform: userBioPref ? [{ scale: pulse }] : [{ scale: 1 }] }}>
+                        <MaterialCommunityIcons
+                          name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
+                          size={userBioPref ? 52 : 48}
+                          color={userBioPref ? COLORS.primary : COLORS.primary}
+                        />
+                      </Animated.View>
+                      <Text style={styles.biometricText}>
+                        {userBioPref ? t('bio_tap_to_login') : t('btn_biometric')}
                       </Text>
+                      {userBioPref && <Text style={styles.biometricSub}>{t('bio_pref_hint')}</Text>}
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+                  )}
 
-              {biometricAvailable && (
-                <TouchableOpacity
-                  style={[styles.biometricBtn, userBioPref && styles.biometricBtnPref]}
-                  onPress={handleBiometricLogin}
-                >
-                  <Animated.View style={{ transform: userBioPref ? [{ scale: pulse }] : [{ scale: 1 }] }}>
-                    <MaterialCommunityIcons
-                      name={Platform.OS === 'ios' ? 'face-recognition' : 'fingerprint'}
-                      size={userBioPref ? 52 : 48}
-                      color={userBioPref ? COLORS.primary : COLORS.primary}
-                    />
-                  </Animated.View>
-                  <Text style={styles.biometricText}>
-                    {userBioPref ? t('bio_tap_to_login') : t('btn_biometric')}
-                  </Text>
-                  {userBioPref && <Text style={styles.biometricSub}>{t('bio_pref_hint')}</Text>}
-                </TouchableOpacity>
+                  <View style={styles.divider}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>{t('or_enter_pin')}</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+
+                  <FormInput label={t('label_phone')} value={loginPhone} onChangeText={setLoginPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+                  <FormInput label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
+                    <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.switchBtn} onPress={startReset}>
+                    <Text style={styles.switchBtnText}>{t('forgot_pin')}</Text>
+                  </TouchableOpacity>
+                </>
               )}
-
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>{t('or_enter_pin')}</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <FormInput label={t('label_phone')} value={loginPhone} onChangeText={setLoginPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
-              <FormInput label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
-
-              <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
-                <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>
-              </TouchableOpacity>
             </View>
           )}
 
-          {isRegistered && mode === 'login' && (
+          {isRegistered && mode === 'login' && !resetMode && (
             <TouchableOpacity style={styles.switchBtn} onPress={() => { setIsRegistered(false); setMode('register'); }}>
               <Text style={styles.switchBtnText}>{t('switch_to_register')}</Text>
             </TouchableOpacity>

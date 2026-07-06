@@ -137,23 +137,42 @@ export default function DoctorScreen() {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <MaterialCommunityIcons name="stethoscope" size={26} color={COLORS.primary} />
-        <Text style={styles.headerTitle}>{t('header_doctor')}</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('PrescriptionSchedule')}
-          style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <MaterialCommunityIcons name="calendar-plus" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <MaterialCommunityIcons name="stethoscope" size={26} color={COLORS.primary} />
+          <Text style={styles.headerTitle}>{t('header_doctor')}</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('PrescriptionSchedule')}
+            style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MaterialCommunityIcons name="calendar-plus" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Profile')}
+            style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MaterialCommunityIcons name="account-cog" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('Profile')}
-          style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: COLORS.surfaceLow, alignItems: 'center', justifyContent: 'center' }}
+          style={styles.profileBar}
+          activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="account-cog" size={20} color={COLORS.primary} />
+          <View style={styles.profileBarLeft}>
+            <View style={styles.profileBarAvatar}>
+              <Text style={styles.profileBarAvatarText}>{(patient?.name || 'D').slice(0, 2).toUpperCase()}</Text>
+            </View>
+            <View>
+              <Text style={styles.profileBarName}>{patient?.name || t('role_doctor')}</Text>
+              <Text style={styles.profileBarSub}>{patient?.specialization || t('role_doctor')}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <MaterialCommunityIcons name="logout" size={18} color={COLORS.red[400]} />
+            <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.outline} />
+          </View>
         </TouchableOpacity>
-      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Patient Summary Card */}
@@ -401,5 +420,18 @@ function getStyles(C) {
       shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
     },
     issueBtnText:         { fontSize: 15, fontFamily: FONT.bodySemiBold, color: '#fff' },
+
+    profileBar: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      marginHorizontal: 16, marginTop: 8, marginBottom: 4,
+      padding: 14, borderRadius: RADIUS.xl,
+      backgroundColor: C.surfaceLowest,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    },
+    profileBarLeft:      { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    profileBarAvatar:    { width: 40, height: 40, borderRadius: 12, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
+    profileBarAvatarText:{ fontSize: 14, fontFamily: FONT.bodyBold, color: '#fff' },
+    profileBarName:      { fontSize: 15, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    profileBarSub:       { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 1 },
   });
 }

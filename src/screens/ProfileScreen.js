@@ -25,6 +25,8 @@ export default function ProfileScreen({ onLogout }) {
   const [phone, setPhone] = useState('');
   const [age, setAge] = useState('');
   const [condition, setCondition] = useState('');
+  const [specialization, setSpecialization] = useState('');
+  const [role, setRole] = useState('patient');
   const [avatarUri, setAvatarUri] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,6 +52,8 @@ export default function ProfileScreen({ onLogout }) {
         setPhone(u.phone || '');
         setAge(u.age ? String(u.age) : '');
         setCondition(u.condition || '');
+        setSpecialization(u.specialization || '');
+        setRole(u.role || 'patient');
         setAvatarUri(u.avatar || null);
       }
       setNotifPermission(permStatus);
@@ -87,8 +91,10 @@ export default function ProfileScreen({ onLogout }) {
         ...existing,
         name: name.trim(),
         phone: phone.trim(),
-        age: parseInt(age.trim(), 10) || 0,
-        condition: condition.trim(),
+        age: role === 'doctor' ? 0 : (parseInt(age.trim(), 10) || 0),
+        condition: role === 'doctor' ? '' : condition.trim(),
+        specialization: role === 'doctor' ? specialization.trim() : '',
+        role,
         avatar: avatarUri,
       });
       Alert.alert(t('saved'), t('saved_profile'));
@@ -196,8 +202,27 @@ export default function ProfileScreen({ onLogout }) {
               <View style={styles.formCard}>
                 <ProfileField label={t('label_name')} value={name} onChangeText={setName} placeholder={t('placeholder_name')} containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
                 <ProfileField label={t('label_phone')} value={phone} onChangeText={setPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
-                <ProfileField label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
-                <ProfileField label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} multiline containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                <View style={[styles.fieldGroup, { flexDirection: 'row', gap: 8 }]}>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <Text style={styles.fieldLabel}>{t('label_role')}</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity style={[styles.roleOpt, role === 'patient' && styles.roleOptActive]} onPress={() => setRole('patient')}>
+                        <Text style={[styles.roleOptText, role === 'patient' && styles.roleOptTextActive]}>{t('role_patient')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.roleOpt, role === 'doctor' && styles.roleOptActive]} onPress={() => setRole('doctor')}>
+                        <Text style={[styles.roleOptText, role === 'doctor' && styles.roleOptTextActive]}>{t('role_doctor')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+                {role === 'doctor' ? (
+                  <ProfileField label={t('label_specialization')} value={specialization} onChangeText={setSpecialization} placeholder={t('placeholder_specialization')} containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                ) : (
+                  <>
+                    <ProfileField label={t('label_age')} value={age} onChangeText={setAge} placeholder={t('placeholder_age')} keyboardType="number-pad" containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                    <ProfileField label={t('label_condition')} value={condition} onChangeText={setCondition} placeholder={t('placeholder_condition')} multiline containerStyle={styles.fieldGroup} labelStyle={styles.fieldLabel} inputStyle={styles.fieldInput} placeholderColor={COLORS.outline} />
+                  </>
+                )}
 
                 <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
                   {saving ? (
@@ -602,5 +627,14 @@ function getStyles(C) {
       fontFamily: FONT.bodySemiBold,
       color: '#fff',
     },
+
+    roleOpt: {
+      flex: 1, paddingVertical: 10, borderRadius: RADIUS.md,
+      alignItems: 'center', backgroundColor: C.surfaceLow,
+      borderWidth: 1, borderColor: C.surfaceHigh,
+    },
+    roleOptActive:    { backgroundColor: C.primary, borderColor: C.primary },
+    roleOptText:      { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant },
+    roleOptTextActive:{ color: '#fff' },
   });
 }

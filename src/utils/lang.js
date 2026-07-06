@@ -32,6 +32,23 @@ const LANG = {
   register:         { sw: 'Jisajili', en: 'Register' },
   register_sub:     { sw: 'Unda akaunti mpya', en: 'Create a new account' },
 
+  // ── Forgot PIN ───────────────────────────────────────────────
+  forgot_pin:          { sw: 'Umesahau PIN?', en: 'Forgot PIN?' },
+  forgot_pin_title:    { sw: 'Weka upya PIN', en: 'Reset PIN' },
+  forgot_pin_phone:    { sw: 'Ingiza namba ya simu ya akaunti yako', en: 'Enter your account phone number' },
+  forgot_pin_next:     { sw: 'Endelea', en: 'Next' },
+  forgot_pin_code_sent: { sw: 'Msimbo wa uthibitisho umetumwa kwenye simu yako', en: 'A verification code has been sent to your phone' },
+  forgot_pin_code_hint: { sw: 'Kwa majaribio, msimbo umeonyeshwa:', en: 'For testing, the code is:' },
+  forgot_pin_code_label: { sw: 'Msimbo wa uthibitisho', en: 'Verification code' },
+  forgot_pin_new:       { sw: 'Weka PIN mpya (tarakimu 4)', en: 'Set new PIN (4 digits)' },
+  forgot_pin_confirm:   { sw: 'Thibitisha PIN mpya', en: 'Confirm new PIN' },
+  forgot_pin_btn:       { sw: 'Weka upya', en: 'Reset' },
+  forgot_pin_success:   { sw: 'PIN imewekwa upya kwa mafanikio!', en: 'PIN reset successfully!' },
+  forgot_pin_no_account:{ sw: 'Hakuna akaunti iliyopatikana kwa namba hii.', en: 'No account found for this number.' },
+  forgot_pin_code_wrong:{ sw: 'Msimbo sio sahihi. Jaribu tena.', en: 'Incorrect code. Try again.' },
+  forgot_pin_mismatch:  { sw: 'PIN mpya hazilingani.', en: 'New PINs do not match.' },
+  forgot_pin_back:      { sw: 'Rudi', en: 'Back' },
+
   // ── Auth Screen ──────────────────────────────────────────────
   auth_biometric_prompt:   { sw: 'Ingiza alama ya uso au kidole', en: 'Authenticate to continue' },
   auth_use_pin:            { sw: 'Tumia PIN', en: 'Use PIN' },

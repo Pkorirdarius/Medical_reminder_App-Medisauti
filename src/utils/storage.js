@@ -103,7 +103,11 @@ async function isFB() {
 export async function saveUser(user) {
   const uid = getUid();
   if (supabase.isConfigured() && uid) {
-    await supabase.fbSaveUser(uid, user);
+    try {
+      await supabase.fbSaveUser(uid, user);
+    } catch (e) {
+      console.warn('fbSaveUser failed — saving locally only:', e.message);
+    }
   }
   const existing = (await getItemDecrypted(KEYS.USER)) || {};
   await setItemEncrypted(KEYS.USER, { ...existing, ...user });
