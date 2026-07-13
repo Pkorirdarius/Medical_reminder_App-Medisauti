@@ -164,6 +164,30 @@ const LANG = {
   source_breakdown:        { sw: 'Vyanzo vya Dawa', en: 'Source Breakdown' },
   source_doctor:           { sw: 'Daktari', en: 'Doctor' },
 
+  // ── Dosage Quantity & Form ──────────────────────────────────
+  label_dosage_quantity:   { sw: 'Kiasi cha dozi', en: 'Dosage quantity' },
+  label_dosage_form:       { sw: 'Aina ya dawa', en: 'Medication form' },
+  placeholder_dosage_qty:  { sw: 'Mf. 1, 2', en: 'e.g. 1, 2' },
+  form_tablet:             { sw: 'Kitabu/tableti', en: 'Tablet' },
+  form_capsule:            { sw: 'Kapsuli', en: 'Capsule' },
+  form_injection:          { sw: 'Sindano', en: 'Injection' },
+  form_syrup:              { sw: 'Dawa ya kunywa', en: 'Syrup' },
+  form_drops:              { sw: 'Matone', en: 'Drops' },
+  form_inhaler:            { sw: 'Vutea', en: 'Inhaler' },
+  form_cream:              { sw: 'Krimu', en: 'Cream' },
+  form_ointment:           { sw: 'Dawa ya kupaka', en: 'Ointment' },
+  form_suppository:        { sw: 'Viashiria', en: 'Suppository' },
+  form_patch:              { sw: 'Patchi', en: 'Patch' },
+  notif_dosage_detail:     { sw: 'Chukua {qty} {form} ya {drug}', en: 'Take {qty} {form} of {drug}' },
+  notif_dosage_simple:     { sw: 'Chukua {drug} {dosage}', en: 'Take {drug} {dosage}' },
+  notif_speak_dosage:      { sw: 'Karibu. Ni wakati wa kuchukua {qty} {form} ya {drug}, {timeLabel}. Tafadhali kumbuka kuchukua dawa yako.', en: 'Hello. It is time to take {qty} {form} of {drug}, {timeLabel}. Please remember to take your medicine.' },
+  notif_speak_simple:      { sw: 'Karibu. Ni wakati wa kuchukua dawa yako ya {drug}, {dosage}, {timeLabel}. Tafadhali kumbuka kuchukua dawa yako.', en: 'Hello. It is time to take your medication, {drug}, {dosage}. Please remember to take your medicine.' },
+  qty_one:                 { sw: 'Moja', en: 'one' },
+  qty_two:                 { sw: 'Mbili', en: 'two' },
+  qty_three:               { sw: 'Tatu', en: 'three' },
+  qty_four:                { sw: 'Nne', en: 'four' },
+  qty_five:                { sw: 'Tano', en: 'five' },
+
   // ── Prescription Form Enhancements ──────────────────────────
   freq_once:               { sw: 'Mara moja kwa siku', en: 'Once daily' },
   freq_twice:              { sw: 'Mara mbili kwa siku', en: 'Twice daily' },
@@ -215,6 +239,10 @@ const LANG = {
   notif_permission_granted:{ sw: 'Arifa zimewashwa!', en: 'Notifications enabled!' },
   notif_time:              { sw: 'Wakati wa kuchukua dawa', en: 'Time to take medication' },
   notif_voice_body:        { sw: 'Ni wakati wa kuchukua {drug}', en: 'Time to take {drug}' },
+  notif_body_detailed:     { sw: 'Chukua {qty} {form} ya {drug} ({dosage})', en: 'Take {qty} {form} of {drug} ({dosage})' },
+  notif_body_simple:       { sw: 'Chukua {drug} {dosage}', en: 'Take {drug} {dosage}' },
+  notif_speak_detailed:    { sw: 'Ni wakati wa kuchukua {qty} {form} ya {drug}, {dosage}, {timeLabel}', en: 'Time to take {qty} {form} of {drug}, {dosage}' },
+  notif_speak_simple_msg:  { sw: 'Ni wakati wa kuchukua dawa yako ya {drug}, {dosage}', en: 'Time to take your medication, {drug}, {dosage}' },
 
   // ── Reminders Screen ─────────────────────────────────────────
   header_reminders:        { sw: 'Vikumbusho', en: 'Reminders' },

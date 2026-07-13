@@ -27,12 +27,27 @@ export default function PrescriptionScheduleScreen() {
 
   const [drugName, setDrugName] = useState('');
   const [dosage, setDosage] = useState('');
+  const [dosageQuantity, setDosageQuantity] = useState('');
+  const [dosageForm, setDosageForm] = useState('tablet');
   const [frequency, setFrequency] = useState('Mara moja kwa siku');
   const [times, setTimes] = useState(['08:00']);
   const [durationValue, setDurationValue] = useState('7');
   const [durationUnit, setDurationUnit] = useState('days');
   const [notes, setNotes] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const dosageForms = [
+    { key: 'tablet', icon: 'pill' },
+    { key: 'capsule', icon: 'pill' },
+    { key: 'injection', icon: 'needle' },
+    { key: 'syrup', icon: 'bottle-tonic-plus' },
+    { key: 'drops', icon: 'water' },
+    { key: 'inhaler', icon: 'weather-windy' },
+    { key: 'cream', icon: 'creation' },
+    { key: 'ointment', icon: 'creation' },
+    { key: 'suppository', icon: 'circle-outline' },
+    { key: 'patch', icon: 'bandage' },
+  ];
 
   useFocusEffect(useCallback(() => {
     loadPatient();
@@ -49,6 +64,8 @@ export default function PrescriptionScheduleScreen() {
   function resetForm() {
     setDrugName('');
     setDosage('');
+    setDosageQuantity('');
+    setDosageForm('tablet');
     setFrequency('Mara moja kwa siku');
     setTimes(['08:00']);
     setDurationValue('7');
@@ -76,6 +93,8 @@ export default function PrescriptionScheduleScreen() {
         id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
         drugName: drugName.trim(),
         dosage: dosage.trim(),
+        dosageQuantity: dosageQuantity.trim(),
+        dosageForm,
         frequency,
         times: times.map(t => t.trim()),
         notes: notes.trim(),
@@ -98,6 +117,8 @@ export default function PrescriptionScheduleScreen() {
         patientName: patient?.name || 'Patient',
         drugName: prescription.drugName,
         dosage: prescription.dosage,
+        dosageQuantity: prescription.dosageQuantity,
+        dosageForm: prescription.dosageForm,
         frequency: prescription.frequency,
         times: prescription.times,
         durationValue: prescription.durationValue,
@@ -239,6 +260,37 @@ export default function PrescriptionScheduleScreen() {
               placeholder={t('placeholder_dosage')}
               placeholderTextColor={COLORS.outline}
             />
+          </View>
+
+          {/* Dosage Quantity */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>{t('label_dosage_quantity')}</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={dosageQuantity}
+              onChangeText={setDosageQuantity}
+              placeholder={t('placeholder_dosage_qty')}
+              placeholderTextColor={COLORS.outline}
+              keyboardType="number-pad"
+            />
+          </View>
+
+          {/* Dosage Form */}
+          <Text style={styles.fieldLabel}>{t('label_dosage_form')}</Text>
+          <View style={styles.dosageFormRow}>
+            {dosageForms.map(df => {
+              const active = dosageForm === df.key;
+              return (
+                <TouchableOpacity
+                  key={df.key}
+                  style={[styles.dosageFormBtn, active && styles.dosageFormBtnActive]}
+                  onPress={() => setDosageForm(df.key)}
+                >
+                  <MaterialCommunityIcons name={df.icon} size={14} color={active ? '#fff' : COLORS.outline} />
+                  <Text style={[styles.dosageFormText, active && styles.dosageFormTextActive]}>{t('form_' + df.key)}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Frequency Presets */}
@@ -408,6 +460,13 @@ function getStyles(C) {
     freqBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
     freqBtnText: { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, textAlign: 'center' },
     freqBtnTextActive: { color: '#fff' },
+
+    /* Dosage Form */
+    dosageFormRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    dosageFormBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh },
+    dosageFormBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
+    dosageFormText: { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant },
+    dosageFormTextActive: { color: '#fff' },
 
     timeRow: { flexDirection: 'row', gap: 8 },
     timePill: {

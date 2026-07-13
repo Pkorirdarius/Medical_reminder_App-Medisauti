@@ -375,15 +375,15 @@ export async function setMyDoctor(doctor) {
 // ── Condition Presets ───────────────────────────────────────────────
 const CONDITION_PRESETS = {
   diabetes: [
-    { drugName: 'Metformin', dosage: '500mg', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
-    { drugName: 'Insulin Glargine (Lantus)', dosage: 'Vitengo 10', frequency: 'Mara moja kwa siku', times: ['21:00'], notes: 'Kabla ya kulala — sindano chini ya ngozi', source: 'system', voiceNotif: true },
+    { drugName: 'Metformin', dosage: '500mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
+    { drugName: 'Insulin Glargine (Lantus)', dosage: '10 units', dosageQuantity: '1', dosageForm: 'injection', frequency: 'Mara moja kwa siku', times: ['21:00'], notes: 'Kabla ya kulala — sindano chini ya ngozi', source: 'system', voiceNotif: true },
   ],
   bp: [
-    { drugName: 'Amlodipine', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
-    { drugName: 'Enalapril', dosage: '5mg', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi pamoja na Amlodipine', source: 'system', voiceNotif: true },
+    { drugName: 'Amlodipine', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
+    { drugName: 'Enalapril', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi pamoja na Amlodipine', source: 'system', voiceNotif: true },
   ],
   hiv: [
-    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala — usikose dozi', source: 'system', voiceNotif: true },
+    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala — usikose dozi', source: 'system', voiceNotif: true },
   ],
 };
 

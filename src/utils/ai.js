@@ -4,15 +4,20 @@ const GITHUB_PAT = process.env.EXPO_PUBLIC_GITHUB_PAT || '';
 const SYSTEM_PROMPT = `You are a medical OCR parser. Given raw OCR text from a medication label, extract and return ONLY valid JSON with these fields:
 {
   "drugName": "string — medication name, properly capitalized",
-  "dosage": "string — e.g. 500mg, 10ml, 1 tablet",
+  "dosage": "string — e.g. 500mg, 10ml",
+  "dosageQuantity": "string — number of tablets/capsules/injections per dose, e.g. '1', '2'. Extract from phrases like 'Take 2 tablets', '1 tablet', '2 capsules'",
+  "dosageForm": "string — form of medication: tablet, capsule, injection, syrup, drops, inhaler, cream, ointment, suppository, patch. Default to 'tablet' if not clear",
   "frequency": "string — e.g. Once daily, Twice daily, Thrice daily, Four times daily",
   "times": ["array of strings in HH:MM format — infer from frequency if not explicit"]
 }
 
 Rules:
 - Infer times from frequency if not present: once → ["08:00"], twice → ["08:00","20:00"], thrice → ["08:00","14:00","20:00"]
+- Extract dosageQuantity from phrases like 'Take 2 tablets' → quantity: '2', form: 'tablet'
+- If the text says 'injection' or 'sindano' or 'inj', set dosageForm to 'injection'
+- If the text says 'syrup' or 'liquid' or 'ml', set dosageForm to 'syrup'
 - Return ONLY the JSON object, no markdown, no explanation
-- If you cannot parse anything, return {"drugName":"","dosage":"","frequency":"","times":[]}`;
+- If you cannot parse anything, return {"drugName":"","dosage":"","dosageQuantity":"","dosageForm":"tablet","frequency":"","times":[]}`;
 
 export function hasProvider() {
   return !!(GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here')
@@ -31,10 +36,12 @@ function buildUserPrompt(rawText) {
 Return a JSON object with these fields:
 - drugName: the medication name
 - dosage: strength or amount (e.g. 500mg, 10ml)
+- dosageQuantity: number of tablets/capsules per dose (e.g. "1", "2"). Extract from phrases like "Take 2 tablets"
+- dosageForm: form of medication (tablet, capsule, injection, syrup, drops, inhaler, cream, ointment, suppository, patch). Default to "tablet"
 - frequency: how often (e.g. Once daily, Twice daily)
 - times: array of 24h times (HH:MM). Infer from frequency if not explicit: once->["08:00"], twice->["08:00","20:00"], thrice->["08:00","14:00","20:00"]
 
-Return only the JSON object, no other text. If unclear, return {"drugName":"","dosage":"","frequency":"","times":[]}`;
+Return only the JSON object, no other text. If unclear, return {"drugName":"","dosage":"","dosageQuantity":"","dosageForm":"tablet","frequency":"","times":[]}`;
 }
 
 async function parseWithGitHub(rawText) {

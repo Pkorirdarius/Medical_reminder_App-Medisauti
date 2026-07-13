@@ -84,6 +84,9 @@ export default function HomeScreen() {
   }
 
   function MedItem({ med }) {
+    const dosageDetail = med.dosageQuantity
+      ? `${med.dosageQuantity} ${t('form_' + (med.dosageForm || 'tablet'))} · ${med.dosage}`
+      : med.dosage;
     return (
       <View style={styles.medRow}>
         <View style={[styles.medDot, { backgroundColor: COLORS.onPrimaryContainer + '30' }]}>
@@ -92,7 +95,7 @@ export default function HomeScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.medName}>{med.drugName} {med.dosage}</Text>
           <Text style={styles.medSub}>
-            {med.frequency} · {med.times.map(t => formatTime12(t)).join(', ')}
+            {dosageDetail} · {med.frequency} · {med.times.map(t => formatTime12(t)).join(', ')}
           </Text>
         </View>
       </View>
@@ -143,7 +146,7 @@ export default function HomeScreen() {
   function handleSpeak() {
     if (!nextReminder) return;
     setSpeaking(true);
-    speakReminder(nextReminder.drugName, nextReminder.dosage, getTimeLabel(nextReminder.nextTime, 'sw'), 'sw');
+    speakReminder(nextReminder, getTimeLabel(nextReminder.nextTime, 'sw'), 'sw');
     setTimeout(() => setSpeaking(false), 5000);
   }
 
@@ -276,6 +279,11 @@ export default function HomeScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.medNameLarge}>{nextReminder.drugName} {nextReminder.dosage}</Text>
+                    {nextReminder.dosageQuantity ? (
+                      <Text style={styles.medDosageDetail}>
+                        {nextReminder.dosageQuantity} {t('form_' + (nextReminder.dosageForm || 'tablet'))}
+                      </Text>
+                    ) : null}
                     <Text style={styles.medSub}>
                       {getTimeLabel(nextReminder.nextTime, 'sw')} · {getTimeLabel(nextReminder.nextTime, 'en')}
                     </Text>
@@ -473,6 +481,7 @@ function getStyles(C) {
     timeBig:        { fontSize: 22, fontFamily: FONT.bold, color: C.primary, letterSpacing: -0.5 },
     timeAmpm:       { fontSize: 10, fontFamily: FONT.bodySemiBold, color: C.primary, opacity: 0.7 },
     medNameLarge:   { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    medDosageDetail:{ fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.primary, marginTop: 2 },
     medSub:         { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2 },
     speakBtn: {
       width: 44, height: 44, borderRadius: 14, backgroundColor: C.primary,

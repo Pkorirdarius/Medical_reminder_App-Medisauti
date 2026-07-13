@@ -21,9 +21,22 @@ import { OCR_WEBVIEW_HTML, parseOCRText } from '../utils/ocr';
 import { parseWithAI, hasProvider, getProvider } from '../utils/ai';
 
 const INITIAL_FORM = {
-  drugName: '', dosage: '', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
+  drugName: '', dosage: '', dosageQuantity: '', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
   durationValue: '', durationUnit: 'days',
 };
+
+const DOSAGE_FORMS = [
+  { key: 'tablet', icon: 'pill' },
+  { key: 'capsule', icon: 'pill' },
+  { key: 'injection', icon: 'needle' },
+  { key: 'syrup', icon: 'bottle-tonic-plus' },
+  { key: 'drops', icon: 'water' },
+  { key: 'inhaler', icon: 'weather-windy' },
+  { key: 'cream', icon: 'creation' },
+  { key: 'ointment', icon: 'creation' },
+  { key: 'suppository', icon: 'circle-outline' },
+  { key: 'patch', icon: 'bandage' },
+];
 
 
 
@@ -54,6 +67,9 @@ export default function PrescriptionScreen({ route }) {
 
   function PrescriptionCard({ item, onDelete, onEdit }) {
     const { t } = useLanguage();
+    const dosageDetail = item.dosageQuantity
+      ? `${item.dosageQuantity} ${t('form_' + (item.dosageForm || 'tablet'))} · ${item.dosage}`
+      : item.dosage;
     return (
       <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
         <View style={styles.medCard}>
@@ -64,7 +80,7 @@ export default function PrescriptionScreen({ route }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
-                <Text style={styles.medCardSub}>{item.frequency} · {item.times.join(', ')}</Text>
+                <Text style={styles.medCardSub}>{dosageDetail} · {item.frequency} · {item.times.join(', ')}</Text>
               </View>
               {item.source === 'doctor' && (
                 <View style={styles.docBadge}>
@@ -114,6 +130,8 @@ export default function PrescriptionScreen({ route }) {
     setForm({
       drugName: item.drugName || '',
       dosage: item.dosage || '',
+      dosageQuantity: item.dosageQuantity || '',
+      dosageForm: item.dosageForm || 'tablet',
       frequency: item.frequency || INITIAL_FORM.frequency,
       times: item.times || INITIAL_FORM.times,
       notes: item.notes || '',
@@ -171,6 +189,8 @@ export default function PrescriptionScreen({ route }) {
       ...f,
       drugName: parsed.drugName || f.drugName,
       dosage: parsed.dosage || f.dosage,
+      dosageQuantity: parsed.dosageQuantity || f.dosageQuantity,
+      dosageForm: parsed.dosageForm || f.dosageForm,
       frequency: parsed.frequency || f.frequency,
       times: parsed.times?.length > 0 ? parsed.times : f.times,
       source: 'manual',
@@ -348,6 +368,27 @@ export default function PrescriptionScreen({ route }) {
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <FormInput label={t('label_drug_name')} value={form.drugName} onChangeText={v => setForm(f => ({ ...f, drugName: v }))} placeholder={t('placeholder_drug_name')} labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
             <FormInput label={t('label_dosage')} value={form.dosage} onChangeText={v => setForm(f => ({ ...f, dosage: v }))} placeholder={t('placeholder_dosage')} labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+
+            {/* Dosage Quantity */}
+            <FormInput label={t('label_dosage_quantity')} value={form.dosageQuantity} onChangeText={v => setForm(f => ({ ...f, dosageQuantity: v }))} placeholder={t('placeholder_dosage_qty')} keyboardType="number-pad" labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
+
+            {/* Dosage Form */}
+            <Text style={styles.inputLabel}>{t('label_dosage_form')}</Text>
+            <View style={styles.dosageFormRow}>
+              {DOSAGE_FORMS.map(df => {
+                const active = form.dosageForm === df.key;
+                return (
+                  <TouchableOpacity
+                    key={df.key}
+                    style={[styles.dosageFormBtn, active && styles.dosageFormBtnActive]}
+                    onPress={() => setForm(f => ({ ...f, dosageForm: df.key }))}
+                  >
+                    <MaterialCommunityIcons name={df.icon} size={14} color={active ? '#fff' : COLORS.outline} />
+                    <Text style={[styles.dosageFormText, active && styles.dosageFormTextActive]}>{t('form_' + df.key)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             {/* Frequency Presets */}
             <Text style={styles.inputLabel}>{t('frequency_presets')}</Text>
@@ -581,6 +622,13 @@ function getStyles(C) {
     freqBtnActive:  { backgroundColor: C.primary, borderColor: C.primary },
     freqBtnText:    { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant, textAlign: 'center' },
     freqBtnTextActive: { color: '#fff' },
+
+    /* Dosage Form Pills */
+    dosageFormRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    dosageFormBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.md, backgroundColor: C.surfaceLow, borderWidth: 1, borderColor: C.surfaceHigh },
+    dosageFormBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
+    dosageFormText: { fontSize: 11, fontFamily: FONT.bodySemiBold, color: C.onSurfaceVariant },
+    dosageFormTextActive: { color: '#fff' },
 
     /* Time Period Pills */
     timePillRow:    { flexDirection: 'row', gap: 8 },

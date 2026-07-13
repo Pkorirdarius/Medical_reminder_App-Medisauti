@@ -12,7 +12,7 @@ import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
-import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission } from '../utils/reminders';
+import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission, buildDosageText } from '../utils/reminders';
 
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number);
@@ -31,6 +31,8 @@ function buildReminders(meds) {
         prescriptionId: med.id,
         drugName: med.dosage ? `${med.drugName} ${med.dosage}` : med.drugName,
         dosage: med.dosage,
+        dosageQuantity: med.dosageQuantity,
+        dosageForm: med.dosageForm,
         notes: med.notes,
         time,
         tMin,
@@ -66,6 +68,9 @@ export default function RemindersScreen() {
     const isTaken = status === 'taken';
     const isSnoozed = status === 'snoozed';
     const isMissed = status === 'missed';
+    const dosageDetail = item.dosageQuantity
+      ? `${item.dosageQuantity} ${t('form_' + (item.dosageForm || 'tablet'))}`
+      : '';
 
     return (
       <View style={[
@@ -81,6 +86,7 @@ export default function RemindersScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.remDrug}>{item.drugName}</Text>
+            {dosageDetail ? <Text style={styles.remDosage}>{dosageDetail}</Text> : null}
             <Text style={styles.remPeriod}>{getTimeLabel(item.time, language)}</Text>
             {item.notes ? <Text style={styles.remNotes}>{item.notes}</Text> : null}
           </View>
@@ -155,7 +161,12 @@ export default function RemindersScreen() {
 
     if (action === 'taken') {
       const label = getTimeLabel(item.time, language);
-      speakReminder(item.drugName.split(' ')[0], item.dosage || '', label, 'sw');
+      speakReminder({
+        drugName: item.drugName.split(' ')[0],
+        dosage: item.dosage || '',
+        dosageQuantity: item.dosageQuantity,
+        dosageForm: item.dosageForm,
+      }, label, 'sw');
     } else if (action === 'snoozed') {
       Alert.alert(t('snooze_alert_title'), t('snooze_alert_body'));
     }
@@ -278,6 +289,7 @@ function getStyles(C) {
     remTime:        { fontSize: 18, fontFamily: FONT.bold, color: C.onSurface, letterSpacing: -0.5 },
     remAmpm:        { fontSize: 10, fontFamily: FONT.body, color: C.outline, marginTop: -1 },
     remDrug:        { fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    remDosage:      { fontSize: 12, fontFamily: FONT.bodySemiBold, color: C.primary, marginTop: 2 },
     remPeriod:      { fontSize: 11, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 1 },
     remNotes:       { fontSize: 11, fontFamily: FONT.body, color: C.outline, marginTop: 4, fontStyle: 'italic' },
 

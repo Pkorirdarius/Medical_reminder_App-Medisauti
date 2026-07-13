@@ -64,7 +64,7 @@ export const OCR_WEBVIEW_HTML = `
  * Heuristically extract prescription fields from raw Tesseract output.
  *
  * Returns:
- *   { drugName, dosage, frequency, times, rawText }
+ *   { drugName, dosage, dosageQuantity, dosageForm, frequency, times, rawText }
  *
  * Examples of text this handles:
  *   "METFORMIN 500mg  Take 2 tablets twice daily  Morning and Evening"
@@ -117,6 +117,8 @@ export function parseOCRText(rawText) {
     return {
       drugName,
       dosage: starDosage,
+      dosageQuantity: '',
+      dosageForm: 'tablet',
       frequency: freqMap[starCount] || `${starCount} times daily`,
       times: timeMap[starCount] || ['08:00'],
       rawText,
@@ -126,6 +128,37 @@ export function parseOCRText(rawText) {
   // ── Dosage ────────────────────────────────────────────────────────
   const dosageMatch = rawText.match(/(\d+\.?\d*\s*(?:mg|mcg|g|ml|iu|units?))/i);
   const dosage = dosageMatch ? dosageMatch[1].trim() : '';
+
+  // ── Dosage Quantity ──────────────────────────────────────────────
+  let dosageQuantity = '';
+  const qtyMatch = rawText.match(/take\s+(\d+)\s+(?:tablet|capsule|pill|tab)/i);
+  if (qtyMatch) {
+    dosageQuantity = qtyMatch[1];
+  }
+
+  // ── Dosage Form ──────────────────────────────────────────────────
+  let dosageForm = 'tablet';
+  if (/injection|inj\.?|sindano/i.test(rawText)) {
+    dosageForm = 'injection';
+  } else if (/syrup|liquid|suspension/i.test(rawText)) {
+    dosageForm = 'syrup';
+  } else if (/capsule|cap\.?/i.test(rawText)) {
+    dosageForm = 'capsule';
+  } else if (/drop|gtt/i.test(rawText)) {
+    dosageForm = 'drops';
+  } else if (/inhaler|puff/i.test(rawText)) {
+    dosageForm = 'inhaler';
+  } else if (/cream|krimu/i.test(rawText)) {
+    dosageForm = 'cream';
+  } else if (/ointment|ointment/i.test(rawText)) {
+    dosageForm = 'ointment';
+  } else if (/suppository/i.test(rawText)) {
+    dosageForm = 'suppository';
+  } else if (/patch|plaster/i.test(rawText)) {
+    dosageForm = 'patch';
+  } else if (/tab\.?|tablet/i.test(rawText)) {
+    dosageForm = 'tablet';
+  }
 
   // ── Frequency ─────────────────────────────────────────────────────
   let frequency = '';
@@ -155,7 +188,7 @@ export function parseOCRText(rawText) {
     ? timeMatches.map(t => normalizeTime(t))
     : (defaultTimes[timesPerDay] || ['08:00']);
 
-  return { drugName, dosage, frequency, times, rawText };
+  return { drugName, dosage, dosageQuantity, dosageForm, frequency, times, rawText };
 }
 
 function normalizeTime(timeStr) {
