@@ -16,6 +16,7 @@ import {
 import AppNavigator from './src/navigation/AppNavigator';
 import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider, useTheme } from './src/utils/ThemeContext';
+import { setupReminderReschedule, teardownReminderReschedule } from './src/utils/reminders';
 
 function StatusBarManager() {
   const { isDark } = useTheme();
@@ -24,6 +25,11 @@ function StatusBarManager() {
 
 export default function App() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    setupReminderReschedule();
+    return () => teardownReminderReschedule();
+  }, []);
 
   useEffect(() => {
     async function load() {

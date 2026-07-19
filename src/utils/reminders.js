@@ -120,6 +120,22 @@ export function normalizeTime(t) {
   return `${String(parseInt(h, 10) || 0).padStart(2, '0')}:${String(parseInt(m, 10) || 0).padStart(2, '0')}`;
 }
 
+// ─── Android-compatible trigger builder ─────────────────────────────
+function secondsUntil(hour, minute) {
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(hour, minute, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  return Math.floor((target.getTime() - now.getTime()) / 1000);
+}
+
+function buildTrigger(hour, minute) {
+  if (Platform.OS === 'android') {
+    return { type: 'timeInterval', seconds: secondsUntil(hour, minute) };
+  }
+  return { type: 'daily', hour, minute };
+}
+
 // ─── Schedule a recurring local notification ─────────────────────────
 /**
  * @param {Object} prescription  - { id, drugName, dosage, times: ['08:00', '18:00'] }
@@ -145,19 +161,61 @@ export async function scheduleReminder(prescription, time, language = 'sw') {
       body,
       data: {
         prescriptionId: prescription.id,
-        scheduledTime:  time,
-        action:         'reminder',
+        scheduledTime:  normalized,
+        drugName:        prescription.drugName,
+        dosage:          prescription.dosage,
+        dosageQuantity:  prescription.dosageQuantity,
+        dosageForm:      prescription.dosageForm,
+        action:          'reminder',
       },
       sound: soundValue,
     },
-    trigger: {
-      type: 'daily',
-      hour,
-      minute,
-    },
+    trigger: buildTrigger(hour, minute),
   });
 
   return notifId;
+}
+
+// ─── Auto-reschedule listener (Android) ─────────────────────────────
+let _rescheduleSubscription = null;
+
+export function setupReminderReschedule() {
+  if (_rescheduleSubscription) return;
+  if (Platform.OS !== 'android') return;
+
+  _rescheduleSubscription = Notifications.addNotificationReceivedListener(
+    async (notification) => {
+      const { data } = notification.request.content;
+      if (data?.action !== 'reminder') return;
+
+      const normalized = normalizeTime(data.scheduledTime);
+      const [h, m] = normalized.split(':').map(Number);
+
+      const savedSound = await getNotificationSound();
+      const soundValue = savedSound === 'none' ? undefined : savedSound === 'default' ? true : savedSound;
+
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: notification.request.content.title,
+            body:  notification.request.content.body,
+            data,
+            sound: soundValue,
+          },
+          trigger: buildTrigger(h, m),
+        });
+      } catch (e) {
+        console.warn('Could not reschedule notification for', normalized, e);
+      }
+    },
+  );
+}
+
+export function teardownReminderReschedule() {
+  if (_rescheduleSubscription) {
+    _rescheduleSubscription.remove();
+    _rescheduleSubscription = null;
+  }
 }
 
 export async function cancelReminder(notificationId) {
