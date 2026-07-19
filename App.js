@@ -17,6 +17,8 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider, useTheme } from './src/utils/ThemeContext';
 import { setupReminderReschedule, teardownReminderReschedule } from './src/utils/reminders';
+import ErrorBoundary from './src/components/ErrorBoundary';
+import OfflineIndicator from './src/components/OfflineIndicator';
 
 function StatusBarManager() {
   const { isDark } = useTheme();
@@ -60,15 +62,18 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <SafeAreaProvider>
-        <LanguageProvider>
-          <NavigationContainer>
-            <StatusBarManager />
-            <AppNavigator />
-          </NavigationContainer>
-        </LanguageProvider>
-      </SafeAreaProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <LanguageProvider>
+            <NavigationContainer>
+              <StatusBarManager />
+              <OfflineIndicator />
+              <AppNavigator />
+            </NavigationContainer>
+          </LanguageProvider>
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

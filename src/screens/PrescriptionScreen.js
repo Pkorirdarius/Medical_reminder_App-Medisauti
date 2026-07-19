@@ -22,7 +22,7 @@ import { parseWithAI, hasProvider, getProvider } from '../utils/ai';
 
 const INITIAL_FORM = {
   drugName: '', dosage: '', dosageQuantity: '', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: '', source: 'manual', voiceNotif: true,
-  durationValue: '', durationUnit: 'days',
+  durationValue: '', durationUnit: 'days', stock: '',
 };
 
 const DOSAGE_FORMS = [
@@ -88,6 +88,12 @@ export default function PrescriptionScreen({ route }) {
                   <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
                 </View>
               )}
+              {item.stock > 0 && item.stock <= 10 && (
+                <View style={[styles.docBadge, { backgroundColor: COLORS.amber[50] }]}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={12} color={COLORS.amber[800]} />
+                  <Text style={[styles.docBadgeText, { color: COLORS.amber[800] }]}>{t('badge_low_stock')}</Text>
+                </View>
+              )}
             </View>
             <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
               <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
@@ -139,6 +145,7 @@ export default function PrescriptionScreen({ route }) {
       voiceNotif: item.voiceNotif !== false,
       durationValue: item.durationValue || '',
       durationUnit: item.durationUnit || 'days',
+      stock: item.stock || '',
     });
     setShowForm(true);
   }
@@ -314,7 +321,7 @@ export default function PrescriptionScreen({ route }) {
         <ActivityIndicator style={{ marginTop: 60, flex: 1 }} color={COLORS.primary} />
       ) : (
         <>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7} accessibilityLabel={t('add_medication')} accessibilityRole="button">
             <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
             <Text style={styles.addBtnText}>{t('add_medication')}</Text>
           </TouchableOpacity>
@@ -461,6 +468,9 @@ export default function PrescriptionScreen({ route }) {
                 ))}
               </View>
             </View>
+
+            {/* Stock */}
+            <FormInput label={t('label_stock')} value={form.stock} onChangeText={v => setForm(f => ({ ...f, stock: v.replace(/\D/g, '') }))} placeholder={t('placeholder_stock')} keyboardType="number-pad" labelStyle={styles.inputLabel} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
             {/* Voice Notification Toggle */}
             <View style={styles.voiceRow}>

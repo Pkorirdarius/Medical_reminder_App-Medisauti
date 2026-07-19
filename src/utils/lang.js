@@ -352,6 +352,18 @@ const LANG = {
   duration_weeks:          { sw: 'Wiki', en: 'Weeks' },
   duration_months:         { sw: 'Miezi', en: 'Months' },
 
+  // ── Stock ────────────────────────────────────────────────────
+  label_stock:             { sw: 'Idadi ya dawa', en: 'Medication stock' },
+  placeholder_stock:       { sw: 'Mf. 30', en: 'e.g. 30' },
+  stock_low:               { sw: 'Dawa inaisha', en: 'Stock running low' },
+
+  // ── Offline ──────────────────────────────────────────────────
+  offline_mode:            { sw: 'Nje ya mtandao — data imeshwa ndani', en: 'Offline mode — data saved locally' },
+
+  // ── Export ───────────────────────────────────────────────────
+  export_json:             { sw: 'Hamisha JSON', en: 'Export JSON' },
+  export_csv:              { sw: 'Hamisha CSV', en: 'Export CSV' },
+
   // ── Prescription Schedule Screen ─────────────────────────────
   header_schedule:         { sw: 'Ratiba ya Dawa', en: 'Prescription Schedule' },
   schedule_title:          { sw: 'Toa Dawa kwa Mgonjwa', en: 'Issue Prescription to Patient' },

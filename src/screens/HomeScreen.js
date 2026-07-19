@@ -9,7 +9,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, getPrescriptions, calcAdherence, getDoctors, getMyDoctor, setMyDoctor } from '../utils/storage';
+import { getUser, getPrescriptions, calcAdherence, getDoctors, getMyDoctor, setMyDoctor, enforceExpiredPrescriptions } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
@@ -104,7 +104,8 @@ export default function HomeScreen() {
 
   async function loadData() {
     try {
-      const [u, meds, adh, docs, myDoc] = await Promise.all([getUser(), getPrescriptions(), calcAdherence(30), getDoctors(), getMyDoctor()]);
+      const meds = await enforceExpiredPrescriptions();
+      const [u, adh, docs, myDoc] = await Promise.all([getUser(), calcAdherence(30), getDoctors(), getMyDoctor()]);
       if (u) setUser(u);
       setP(meds);
       setAdh(adh);
@@ -288,7 +289,7 @@ export default function HomeScreen() {
                       {getTimeLabel(nextReminder.nextTime, 'sw')} · {getTimeLabel(nextReminder.nextTime, 'en')}
                     </Text>
                   </View>
-                  <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak} activeOpacity={0.7}>
+                  <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak} activeOpacity={0.7} accessibilityLabel={t('voice_label')} accessibilityRole="button">
                     <MaterialCommunityIcons name={speaking ? 'volume-high' : 'volume-medium'} size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>

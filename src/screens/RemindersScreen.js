@@ -12,7 +12,7 @@ import { getPrescriptions, logDose, getUser } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
-import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission, buildDosageText } from '../utils/reminders';
+import { speakReminder, formatTime12, getTimeLabel, requestNotificationPermission, buildDosageText, snoozeReminder } from '../utils/reminders';
 
 function timeToMinutes(t) {
   const [h, m] = t.split(':').map(Number);
@@ -95,13 +95,13 @@ export default function RemindersScreen() {
         <View style={styles.remActions}>
           {!status ? (
             <>
-              <TouchableOpacity style={styles.actionTaken} onPress={() => onAction(item.key, 'taken', item)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionTaken} onPress={() => onAction(item.key, 'taken', item)} activeOpacity={0.7} accessibilityLabel={t('status_taken')} accessibilityRole="button">
                 <MaterialCommunityIcons name="check" size={18} color="#fff" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionSnooze} onPress={() => onAction(item.key, 'snoozed', item)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionSnooze} onPress={() => onAction(item.key, 'snoozed', item)} activeOpacity={0.7} accessibilityLabel={t('status_snoozed')} accessibilityRole="button">
                 <MaterialCommunityIcons name="clock-outline" size={18} color={COLORS.amber[800]} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionMissed} onPress={() => onAction(item.key, 'missed', item)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.actionMissed} onPress={() => onAction(item.key, 'missed', item)} activeOpacity={0.7} accessibilityLabel={t('status_missed')} accessibilityRole="button">
                 <MaterialCommunityIcons name="close" size={18} color="#fff" />
               </TouchableOpacity>
             </>
@@ -168,7 +168,12 @@ export default function RemindersScreen() {
         dosageForm: item.dosageForm,
       }, label, 'sw');
     } else if (action === 'snoozed') {
-      Alert.alert(t('snooze_alert_title'), t('snooze_alert_body'));
+      try {
+        await snoozeReminder(item, language);
+        Alert.alert(t('snooze_alert_title'), t('snooze_alert_body'));
+      } catch (e) {
+        console.warn('Snooze failed', e);
+      }
     }
   }
 

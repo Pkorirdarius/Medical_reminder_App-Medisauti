@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator, Animated, Dimensions, Alert,
+  ActivityIndicator, Animated, Dimensions, Alert, Modal, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -13,6 +13,7 @@ import { RADIUS, SHADOW, FONT } from '../utils/constants';
 import { getUser, getPrescriptions } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import { formatTime12 } from '../utils/reminders';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SIDE_PAD = 16;
@@ -26,6 +27,7 @@ export default function ScanScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
+  const [showRecent, setShowRecent] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const { language, toggleLanguage, t } = useLanguage();
   const { COLORS } = useTheme();
@@ -48,8 +50,9 @@ export default function ScanScreen() {
 
   useFocusEffect(useCallback(() => {
     (async () => {
-      const u = await getUser();
+      const [u, meds] = await Promise.all([getUser(), getPrescriptions()]);
       if (u) setUser(u);
+      setRecentScans(meds.filter(m => m.source === 'scan').slice(0, 10));
     })();
   }, []));
 
@@ -180,7 +183,7 @@ export default function ScanScreen() {
             <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.primary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionCard} onPress={() => {}}>
+          <TouchableOpacity style={styles.actionCard} onPress={() => setShowRecent(true)}>
             <View style={[styles.actionIconWrap, { backgroundColor: COLORS.secondaryContainer + '50' }]}>
               <MaterialCommunityIcons name="history" size={24} color={COLORS.onSecondaryContainer} />
             </View>
@@ -204,6 +207,49 @@ export default function ScanScreen() {
           <View style={styles.tipDeco} />
         </View>
       </ScrollView>
+
+      {/* ── Recent Scans Modal ── */}
+      <Modal visible={showRecent} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.modalScreen, { paddingTop: insets.top }]}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowRecent(false)}>
+              <MaterialCommunityIcons name="close" size={24} color={COLORS.onSurface} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('recent_scans')}</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          {recentScans.length === 0 ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+              <MaterialCommunityIcons name="scan-off" size={48} color={COLORS.outline} />
+              <Text style={{ fontSize: 14, fontFamily: FONT.body, color: COLORS.outline, marginTop: 12, textAlign: 'center' }}>
+                {t('empty_medications_sub')}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={recentScans}
+              keyExtractor={item => item.id}
+              contentContainerStyle={{ padding: 16 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.scanItem}
+                  onPress={() => { setShowRecent(false); navigation.navigate('PrescriptionForm', { scanImage: null, source: 'scan' }); }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.scanItemIcon, { backgroundColor: COLORS.primary + '15' }]}>
+                    <MaterialCommunityIcons name="pill" size={20} color={COLORS.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.scanItemName}>{item.drugName} {item.dosage}</Text>
+                    <Text style={styles.scanItemDetail}>{item.frequency} · {item.times?.join(', ')}</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.outline} />
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -513,6 +559,32 @@ function getStyles(C) {
     height: 180,
     borderRadius: 90,
     backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  modalScreen: {
+    flex: 1,
+    backgroundColor: C.background,
+  },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: C.surfaceLowest, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh,
+  },
+  modalTitle: {
+    fontSize: 17, fontFamily: FONT.bold, color: C.onSurface,
+  },
+  scanItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, padding: 14, marginBottom: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+  },
+  scanItemIcon: {
+    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  scanItemName: {
+    fontSize: 14, fontFamily: FONT.bodySemiBold, color: C.onSurface,
+  },
+  scanItemDetail: {
+    fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2,
   },
   });
 }

@@ -226,6 +226,29 @@ export async function cancelAllReminders() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
+export async function snoozeReminder(item, language = 'sw') {
+  const savedSound = await getNotificationSound();
+  const soundValue = savedSound === 'none' ? undefined : savedSound === 'default' ? true : savedSound;
+
+  const title = language === 'sw' ? 'Dawa - Kikumbusho' : 'Medication Reminder';
+  const body = buildDosageText({
+    drugName: item.drugName,
+    dosage: item.dosage,
+    dosageQuantity: item.dosageQuantity,
+    dosageForm: item.dosageForm,
+  }, language);
+
+  return Notifications.scheduleNotificationAsync({
+    content: {
+      title,
+      body,
+      data: { prescriptionId: item.prescriptionId, scheduledTime: item.time, action: 'reminder' },
+      sound: soundValue,
+    },
+    trigger: { type: 'timeInterval', seconds: 600 },
+  });
+}
+
 // ─── Swahili Text-to-Speech ──────────────────────────────────────────
 /**
  * Speak a medication reminder in Swahili (falls back to English).

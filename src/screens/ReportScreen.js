@@ -12,7 +12,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
 import { RADIUS, FONT } from '../utils/constants';
-import { getPrescriptions, calcAdherence, getDailyStreak, getPerMedicationAdherence, getMissedDosePatterns, getAdherenceTrend, getUser } from '../utils/storage';
+import { getPrescriptions, calcAdherence, getDailyStreak, getPerMedicationAdherence, getMissedDosePatterns, getAdherenceTrend, getUser, exportDataAsJSON, exportDataAsCSV } from '../utils/storage';
 import { useHighContrast } from '../utils/HighContrastContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
@@ -130,6 +130,26 @@ export default function ReportScreen() {
     }
   }
 
+  async function exportJSON() {
+    try {
+      const data = await exportDataAsJSON();
+      const { uri } = await Print.printToFileAsync({ html: `<pre>${data}</pre>` });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export MediSauti Data' });
+      }
+    } catch (e) { Alert.alert('Error', e.message); }
+  }
+
+  async function exportCSV() {
+    try {
+      const csv = await exportDataAsCSV();
+      const { uri } = await Print.printToFileAsync({ html: `<pre>${csv}</pre>` });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Export MediSauti Data' });
+      }
+    } catch (e) { Alert.alert('Error', e.message); }
+  }
+
   const maxPattern = Math.max(1, ...Object.values(patterns));
 
   function ProgressBar({ value, color, height = 6 }) {
@@ -221,6 +241,18 @@ export default function ReportScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.shareMore} onPress={() => shareReport('other')} activeOpacity={0.7}>
               <MaterialCommunityIcons name="share-variant" size={20} color={COLORS.outline} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Data Export Row */}
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.previewBtn} onPress={exportJSON} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="code-json" size={20} color="#fff" />
+              <Text style={styles.previewBtnText}>JSON</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.exportBtn, { backgroundColor: COLORS.secondary }]} onPress={exportCSV} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="file-delimited" size={20} color="#fff" />
+              <Text style={styles.exportBtnText}>CSV</Text>
             </TouchableOpacity>
           </View>
 

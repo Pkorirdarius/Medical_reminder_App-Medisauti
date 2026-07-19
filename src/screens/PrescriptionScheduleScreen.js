@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator,
+  TextInput, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { RADIUS, FONT } from '../utils/constants';
 import { useTheme } from '../utils/ThemeContext';
@@ -34,7 +35,8 @@ export default function PrescriptionScheduleScreen() {
   const [durationValue, setDurationValue] = useState('7');
   const [durationUnit, setDurationUnit] = useState('days');
   const [notes, setNotes] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const dosageForms = [
     { key: 'tablet', icon: 'pill' },
@@ -71,7 +73,7 @@ export default function PrescriptionScheduleScreen() {
     setDurationValue('7');
     setDurationUnit('days');
     setNotes('');
-    setStartDate(new Date().toISOString().slice(0, 10));
+    setStartDate(new Date());
     setSuccess(false);
   }
 
@@ -105,7 +107,7 @@ export default function PrescriptionScheduleScreen() {
         notifIds: [],
         durationValue: parseInt(durationValue, 10) || 7,
         durationUnit,
-        startDate,
+        startDate: startDate.toISOString().slice(0, 10),
         issuedBy: patient?.name || 'Doctor',
         scheduled: true,
       };
@@ -366,21 +368,25 @@ export default function PrescriptionScheduleScreen() {
           <Text style={styles.fieldLabel}>{t('schedule_start_label')}</Text>
           <TouchableOpacity
             style={styles.dateBtn}
-            onPress={() => {
-              const today = new Date().toISOString().slice(0, 10);
-              Alert.alert(
-                t('schedule_start_label'),
-                `${t('schedule_from_today')}: ${today}`,
-                [
-                  { text: t('schedule_from_today'), onPress: () => setStartDate(today) },
-                  { text: t('cancel'), style: 'cancel' },
-                ]
-              );
-            }}
+            onPress={() => setShowDatePicker(true)}
+            accessibilityLabel={t('schedule_start_label')}
+            accessibilityRole="button"
           >
             <MaterialCommunityIcons name="calendar" size={20} color={COLORS.primary} />
-            <Text style={styles.dateBtnText}>{startDate}</Text>
+            <Text style={styles.dateBtnText}>{startDate.toISOString().slice(0, 10)}</Text>
           </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minimumDate={new Date()}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(Platform.OS === 'ios');
+                if (selectedDate) setStartDate(selectedDate);
+              }}
+            />
+          )}
 
           {/* Notes */}
           <View style={styles.fieldGroup}>

@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator,
+  TextInput, ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -63,6 +63,7 @@ export default function PatientSearchScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [selectedRx, setSelectedRx] = useState(null);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
@@ -196,7 +197,7 @@ export default function PatientSearchScreen() {
                     key={rx.id || i}
                     style={[styles.rxRow, { borderBottomWidth: i < rxs.length - 1 ? 0.5 : 0, borderBottomColor: COLORS.surfaceHigh }]}
                     activeOpacity={0.6}
-                    onPress={() => navigation.navigate('Profile')}
+                    onPress={() => setSelectedRx(rx)}
                   >
                     <View style={[styles.rxIcon, { backgroundColor: COLORS.primary + '12' }]}>
                       <MaterialCommunityIcons name="pill" size={16} color={COLORS.primary} />
@@ -222,6 +223,54 @@ export default function PatientSearchScreen() {
           })
         )}
       </ScrollView>
+
+      {/* ── Prescription Detail Modal ── */}
+      <Modal visible={!!selectedRx} transparent animationType="fade" onRequestClose={() => setSelectedRx(null)}>
+        <View style={styles.detailOverlay}>
+          <View style={styles.detailCard}>
+            <View style={styles.detailHeader}>
+              <View style={[styles.detailIcon, { backgroundColor: COLORS.primary + '15' }]}>
+                <MaterialCommunityIcons name="pill" size={24} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.detailName}>{selectedRx?.drugName} {selectedRx?.dosage}</Text>
+                <Text style={styles.detailSub}>{selectedRx?.frequency}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedRx(null)}>
+                <MaterialCommunityIcons name="close" size={22} color={COLORS.outline} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.detailBody}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('label_dosage_form')}</Text>
+                <Text style={styles.detailValue}>{t('form_' + (selectedRx?.dosageForm || 'tablet'))}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('label_times')}</Text>
+                <Text style={styles.detailValue}>{selectedRx?.times?.join(', ')}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('label_source')}</Text>
+                <Text style={styles.detailValue}>{selectedRx?.source === 'doctor' ? t('source_doctor') : t('source_manual')}</Text>
+              </View>
+              {selectedRx?.notes ? (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>{t('label_notes')}</Text>
+                  <Text style={styles.detailValue}>{selectedRx?.notes}</Text>
+                </View>
+              ) : null}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{t('badge_active')}</Text>
+                <View style={[styles.detailBadge, { backgroundColor: selectedRx?.active !== false ? COLORS.green[50] : COLORS.red[50] }]}>
+                  <Text style={[styles.detailBadgeText, { color: selectedRx?.active !== false ? COLORS.green[400] : COLORS.red[400] }]}>
+                    {selectedRx?.active !== false ? t('badge_active') : t('status_missed')}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -285,5 +334,18 @@ function getStyles(C) {
     /* Empty */
     emptyWrap:       { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
     emptyText:       { fontSize: 14, fontFamily: FONT.body, color: C.outline, textAlign: 'center' },
+
+    detailOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
+    detailCard:      { width: '100%', backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 12 },
+    detailHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
+    detailIcon:      { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    detailName:      { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    detailSub:       { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2 },
+    detailBody:      { padding: 16, gap: 12 },
+    detailRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    detailLabel:     { fontSize: 13, fontFamily: FONT.body, color: C.outline },
+    detailValue:     { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.onSurface },
+    detailBadge:     { borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3 },
+    detailBadgeText: { fontSize: 12, fontFamily: FONT.bodySemiBold },
   });
 }

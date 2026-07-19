@@ -467,3 +467,66 @@ export async function clearUserData() {
     KEYS.MY_DOCTOR,
   ]);
 }
+
+// ── Duration Enforcement ────────────────────────────────────────
+export async function enforceExpiredPrescriptions() {
+  const prescriptions = await getPrescriptions();
+  let changed = false;
+  const now = new Date();
+  for (const rx of prescriptions) {
+    if (rx.active === false) continue;
+    if (!rx.durationValue || !rx.startDate) continue;
+    const start = new Date(rx.startDate);
+    const dur = parseInt(rx.durationValue, 10);
+    if (!dur) continue;
+    let ms;
+    switch (rx.durationUnit) {
+      case 'weeks': ms = dur * 7 * 86400000; break;
+      case 'months': ms = dur * 30 * 86400000; break;
+      default: ms = dur * 86400000;
+    }
+    if (now.getTime() > start.getTime() + ms) {
+      rx.active = false;
+      changed = true;
+    }
+  }
+  if (changed) {
+    await setItemEncrypted(KEYS.PRESCRIPTIONS, prescriptions);
+    if (await isFB()) {
+      for (const rx of prescriptions) {
+        if (rx.active === false) await supabase.fbSavePrescription(getUid(), rx);
+      }
+    }
+  }
+  return prescriptions;
+}
+
+// ── Medication Stock ──────────────────────────────────────────
+export async function updateMedicationStock(prescriptionId, stock) {
+  const list = await getPrescriptions();
+  const rx = list.find(p => p.id === prescriptionId);
+  if (rx) {
+    rx.stock = stock;
+    await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
+    if (await isFB()) await supabase.fbSavePrescription(getUid(), rx);
+  }
+}
+
+// ── Data Export ───────────────────────────────────────────────
+export async function exportDataAsJSON() {
+  const [prescriptions, logs, user] = await Promise.all([
+    getPrescriptions(), getLogs(), getUser(),
+  ]);
+  return JSON.stringify({ user, prescriptions, adherenceLogs: logs }, null, 2);
+}
+
+export async function exportDataAsCSV() {
+  const logs = await getLogs();
+  const prescriptions = await getPrescriptions();
+  const header = 'Date,Drug Name,Dosage,Status,Scheduled Time,Logged At\n';
+  const rows = logs.map(l => {
+    const rx = prescriptions.find(p => p.id === l.prescriptionId);
+    return `${l.loggedAt?.slice(0, 10) || ''},${rx?.drugName || 'Unknown'},${rx?.dosage || ''},${l.status},${l.scheduledTime || ''},${l.loggedAt || ''}`;
+  }).join('\n');
+  return header + rows;
+}
