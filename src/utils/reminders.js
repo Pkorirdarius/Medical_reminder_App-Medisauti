@@ -300,7 +300,7 @@ export async function sendTestNotification(language = 'sw', drugName = 'Test', d
     trigger: null,
   });
 
-  speakReminder(rx, 'sasa', language);
+  speakReminder(rx, '', '', language);
 
   return notifId;
 }

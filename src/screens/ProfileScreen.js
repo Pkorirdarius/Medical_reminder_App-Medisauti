@@ -135,7 +135,7 @@ export default function ProfileScreen({ onLogout }) {
         Alert.alert(t('notif_permission_title'), t('notif_permission_denied'));
         return;
       }
-      await sendTestNotification(language, 'Paracetamol', '500mg');
+      await sendTestNotification(language, 'Paracetamol', '', '2', 'tablet');
       Alert.alert(t('test_notif_sent_title'), t('test_notif_sent_body'));
     } catch (e) {
       Alert.alert(t('error'), e.message);
