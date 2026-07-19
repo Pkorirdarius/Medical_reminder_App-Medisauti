@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { NetInfo } from '@react-native-community/netinfo';
+import NetInfo from '@react-native-community/netinfo';
 import { FONT } from '../utils/constants';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
