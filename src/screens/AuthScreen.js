@@ -152,18 +152,27 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           setRegistering(false);
           return;
         }
-        if (existingUser.pin === pin) {
-          Alert.alert(t('error'), t('pin_taken'));
-          setRegistering(false);
-          return;
+        const existingHash = await getStoredPinHash();
+        if (existingHash) {
+          const inputHash = await hashPin(pin);
+          if (inputHash === existingHash) {
+            Alert.alert(t('error'), t('pin_taken'));
+            setRegistering(false);
+            return;
+          }
         }
       }
       const doctors = await getDoctors();
-      if (doctors.some(d => d.pin === pin)) {
+      const inputHash = await hashPin(pin);
+      if (doctors.some(d => d.pinHash && d.pinHash === inputHash)) {
         Alert.alert(t('error'), t('pin_taken'));
         setRegistering(false);
         return;
       }
+
+      // Hash PIN first — never store raw PIN in user object
+      const pinHash = await hashPin(pin);
+      await storePinHash(pinHash);
 
       const user = {
         name: name.trim(), phone: phone.trim(),
@@ -171,13 +180,9 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         condition: role === 'patient' ? condition.trim() : specialization.trim(),
         role,
         specialization: role === 'doctor' ? specialization.trim() : '',
-        pin, createdAt: new Date().toISOString(),
+        pinHash, createdAt: new Date().toISOString(),
         biometricEnabled: optInBio,
       };
-
-      // Hash PIN and store securely
-      const pinHash = await hashPin(pin);
-      await storePinHash(pinHash);
 
       // Generate random Supabase password (never store raw PIN as password)
       const sbPassword = await generateRandomPassword();
@@ -186,14 +191,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       let sbUid = null;
       if (sbConfigured()) {
         sbUid = await sbRegister(phone.trim(), pinHash, user);
-        // Store the hashed password in SecureStore for the Supabase auth session
         await storeSupabasePassword(pinHash);
       }
       if (sbUid) user.uid = sbUid;
       await saveUser(user);
 
       if (role === 'doctor') {
-        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin, uid: sbUid });
+        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pinHash, uid: sbUid });
         Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       } else {
         await clearUserData();
@@ -222,7 +226,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     try {
       if (sbConfigured()) {
-        const uid = await sbLogin(loginPhone, loginPin);
+        const pinHash = await hashPin(loginPin);
+        const uid = await sbLogin(loginPhone, pinHash);
         const previousUser = await getUser();
         if (previousUser && previousUser.phone && previousUser.phone !== loginPhone) {
           await clearUserData();
@@ -236,7 +241,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           }
         }
         if (!remoteUser) {
-          remoteUser = { uid, phone: loginPhone, pin: loginPin, role: 'patient', name: loginPhone, createdAt: new Date().toISOString() };
+          remoteUser = { uid, phone: loginPhone, role: 'patient', name: loginPhone, createdAt: new Date().toISOString() };
         }
         await saveUser(remoteUser);
         onAuthSuccess(remoteUser.role || 'patient');
@@ -258,12 +263,18 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           const inputHash = await hashPin(loginPin);
           pinValid = inputHash === storedHash;
         }
-        // Legacy fallback: plain text comparison
-        if (!pinValid && user.pin === loginPin) {
+        // Legacy fallback: user has plain text pin in user object
+        if (!pinValid && (user.pin === loginPin || user.pinHash === await hashPin(loginPin))) {
           pinValid = true;
           // Migrate: store hash for next time
           const newHash = await hashPin(loginPin);
           await storePinHash(newHash);
+          // Migrate user object: replace pin with pinHash
+          if (user.pin && !user.pinHash) {
+            const migrated = { ...user, pinHash: newHash };
+            delete migrated.pin;
+            await saveUser(migrated);
+          }
         }
         if (!pinValid) {
           failedAttempts.current++;
@@ -339,10 +350,9 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     setResetting(true);
     try {
       if (sbConfigured()) {
-        // Verify code via Supabase Edge Function + update password
-        const newPw = await generateRandomPassword();
-        await verifySmsCode(resetPhone.trim(), codeInput.trim(), newPw);
-        await storeSupabasePassword(newPw);
+        const tempPw = await generateRandomPassword();
+        const result = await verifySmsCode(resetPhone.trim(), codeInput.trim(), tempPw);
+        if (result?.user_id) setResetUid(result.user_id);
         setResetMode('newPin');
       }
     } catch (e) {
@@ -358,7 +368,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     setResetting(true);
     try {
       const localUser = await getUser();
-      const updated = { ...(localUser || {}), pin: newPin };
+      const updated = { ...(localUser || {}), pinHash: await hashPin(newPin) };
       await saveUser(updated);
 
       // Update PIN hash in SecureStore
@@ -368,16 +378,18 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       // Update Supabase auth password to match new PIN hash
       if (sbConfigured() && resetUid) {
         try {
-          const newPw = await generateRandomPassword();
-          await storeSupabasePassword(newPw);
-          // Re-register with new PIN hash for Supabase auth
+          // Update Supabase auth password to new PIN hash
+          const { updateUserPassword } = await import('../utils/supabase');
+          await updateUserPassword(newHash, newHash);
+          await storeSupabasePassword(newHash);
+          // Update user data in Supabase
           const sbClient = getSupabaseClient();
           if (sbClient) {
             await sbClient.from('users').update({
               data: { ...updated, updatedAt: new Date().toISOString() },
             }).eq('id', resetUid);
           }
-        } catch (_) {}
+        } catch (e) { console.warn('Supabase password update failed:', e.message); }
       }
       Alert.alert(t('success'), t('forgot_pin_success'));
       setResetMode('');

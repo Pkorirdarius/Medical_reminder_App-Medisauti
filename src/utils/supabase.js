@@ -62,9 +62,9 @@ function getClient() {
   return supabase;
 }
 
-async function registerUser(phone, pin, userData) {
+async function registerUser(phone, pinHash, userData) {
   const email = makeEmail(phone);
-  const password = await makePassword(pin);
+  const password = await makePassword(pinHash);
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   const uid = data.user.id;
@@ -75,7 +75,7 @@ async function registerUser(phone, pin, userData) {
       data: {
         ...userData,
         phone,
-        pin,
+        pinHash,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -86,9 +86,9 @@ async function registerUser(phone, pin, userData) {
   return uid;
 }
 
-async function loginUser(phone, pin) {
+async function loginUser(phone, pinOrHash) {
   const email = makeEmail(phone);
-  const password = await makePassword(pin);
+  const password = await makePassword(pinOrHash);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data.user.id;
@@ -280,13 +280,6 @@ async function sbGetDoctorPatients(doctorUid) {
   }).filter(p => p.name);
 }
 
-async function sbGetUserByPhone(phone) {
-  if (!supabase) return null;
-  const { data } = await supabase.from('users').select('*').eq('phone', phone).maybeSingle();
-  if (!data) return null;
-  return { uid: data.id, ...data.data, phone: data.phone };
-}
-
 async function sbGetPatientPrescriptions(patientUid) {
   if (!supabase) return [];
   const { data } = await supabase.from('prescriptions').select('*').eq('user_id', patientUid);
@@ -343,7 +336,7 @@ export {
   sbGetDoctors, sbSaveDoctor,
   sbGetSchedules, sbSaveSchedule,
   sbGetMyDoctor, sbSetMyDoctor,
-  sbGetDoctorPatients, sbGetUserByPhone,
+  sbGetDoctorPatients,
   sbGetPatientPrescriptions, sbGetPatientLogs,
   sbGetConditionPresets,
   sbDeleteAllUserData,

@@ -61,11 +61,9 @@ CREATE POLICY "doctors_update_own" ON doctors
 -- Doctors: authenticated users can still read the directory
 -- (doctors_read_all already exists from initial schema)
 
--- Users: allow reading by phone (for PIN reset lookup)
-CREATE POLICY "users_read_by_phone" ON users
-  FOR SELECT USING (
-    auth.role() = 'authenticated'
-  );
+-- NOTE: users_read_by_phone was REMOVED — it allowed any authenticated
+-- user to read ALL user data (name, phone, condition, pinHash).
+-- PIN reset uses verify-sms Edge Function with service_role key instead.
 
 -- SMS codes: service_role only (Edge Functions use service key)
 -- No user-level policies needed — Edge Functions use service_role key

@@ -81,21 +81,25 @@ async function encrypt(text) {
   return b64Encode(unescape(encodeURIComponent(xored)));
 }
 
-async function decrypt(ciphertext) {
+async function decrypt(ciphertext, storageKey) {
   try {
     const key = await getEncryptionKey();
     const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
-    return xorEncrypt(xored, key);
+    return { plain: xorEncrypt(xored, key), migrated: false };
   } catch {
     // Try legacy decryption (old hardcoded key) for migration
     try {
       const LEGACY_KEY = 'medisauti-2024-enc-key!';
       const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
       const plain = xorEncrypt(xored, LEGACY_KEY);
-      // Re-encrypt with new key and save
-      return plain;
+      // Re-encrypt with new key and save immediately to prevent data loss
+      if (storageKey && plain) {
+        const reEncrypted = await encrypt(plain);
+        AsyncStorage.setItem(storageKey, reEncrypted).catch(() => {});
+      }
+      return { plain, migrated: true };
     } catch {
-      return '';
+      return { plain: '', migrated: false };
     }
   }
 }
@@ -119,7 +123,7 @@ async function getItemDecrypted(key) {
   const encrypted = await AsyncStorage.getItem(key);
   if (!encrypted) return null;
   try {
-    const plain = await decrypt(encrypted);
+    const { plain } = await decrypt(encrypted, key);
     return JSON.parse(plain);
   } catch {
     try {
@@ -220,7 +224,11 @@ export async function getUser() {
 
 export async function getIsRegistered() {
   const user = await getUser();
-  return user !== null && user.name && user.pin;
+  if (!user || !user.name) return false;
+  // Check for pinHash (new) or pin (legacy migration)
+  if (user.pinHash) return true;
+  if (user.pin) return true;
+  return false;
 }
 
 // ── Prescriptions ───────────────────────────────────────────────────

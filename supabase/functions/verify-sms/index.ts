@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({ success: true, message: "Password updated" }),
+      JSON.stringify({ success: true, message: "Password updated", user_id: userData.id }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
