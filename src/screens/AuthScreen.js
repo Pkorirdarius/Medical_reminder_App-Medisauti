@@ -8,8 +8,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
-import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors, clearUserData } from '../utils/storage';
-import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient } from '../utils/supabase';
+import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors, clearUserData, hashPin, storePinHash, getStoredPinHash, generateRandomPassword, storeSupabasePassword, getSupabasePassword } from '../utils/storage';
+import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient, sendSmsCode, verifySmsCode } from '../utils/supabase';
 import { scheduleReminder, cancelAllReminders } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
@@ -44,7 +44,6 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [registering, setRegistering] = useState(false);
   const [resetMode, setResetMode] = useState('');
   const [resetPhone, setResetPhone] = useState('');
-  const [generatedCode, setGeneratedCode] = useState('');
   const [codeInput, setCodeInput] = useState('');
   const [newPin, setNewPin] = useState('');
   const [newConfirmPin, setNewConfirmPin] = useState('');
@@ -176,9 +175,19 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         biometricEnabled: optInBio,
       };
 
+      // Hash PIN and store securely
+      const pinHash = await hashPin(pin);
+      await storePinHash(pinHash);
+
+      // Generate random Supabase password (never store raw PIN as password)
+      const sbPassword = await generateRandomPassword();
+      await storeSupabasePassword(sbPassword);
+
       let sbUid = null;
       if (sbConfigured()) {
-        sbUid = await sbRegister(phone.trim(), pin, user);
+        sbUid = await sbRegister(phone.trim(), pinHash, user);
+        // Store the hashed password in SecureStore for the Supabase auth session
+        await storeSupabasePassword(pinHash);
       }
       if (sbUid) user.uid = sbUid;
       await saveUser(user);
@@ -242,7 +251,21 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           Alert.alert(t('error'), t('no_account_found'));
           return;
         }
-        if (user.pin !== loginPin) {
+        // Verify PIN: try hash comparison first, fall back to plain text for legacy
+        const storedHash = await getStoredPinHash();
+        let pinValid = false;
+        if (storedHash) {
+          const inputHash = await hashPin(loginPin);
+          pinValid = inputHash === storedHash;
+        }
+        // Legacy fallback: plain text comparison
+        if (!pinValid && user.pin === loginPin) {
+          pinValid = true;
+          // Migrate: store hash for next time
+          const newHash = await hashPin(loginPin);
+          await storePinHash(newHash);
+        }
+        if (!pinValid) {
           failedAttempts.current++;
           if (failedAttempts.current >= 5) {
             lockoutUntil.current = Date.now() + 30000;
@@ -277,10 +300,9 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
   }
 
-  // ── Forgot PIN ──────────────────────────────────────────────────
+  // ── Forgot PIN (real SMS verification) ──────────────────────
   function startReset() {
     setResetPhone('');
-    setGeneratedCode('');
     setCodeInput('');
     setNewPin('');
     setNewConfirmPin('');
@@ -295,41 +317,37 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     }
     setResetting(true);
     try {
-      let foundUser = null;
-      const sbClient = getSupabaseClient();
-      if (sbConfigured() && sbClient) {
-        const { data } = await sbClient
-          .from('users')
-          .select('*')
-          .eq('phone', resetPhone.trim())
-          .maybeSingle();
-        if (data) {
-          foundUser = { uid: data.id, ...data.data, phone: data.phone };
-          setResetUid(data.id);
-        }
+      if (sbConfigured()) {
+        // Send real SMS via Supabase Edge Function + Twilio
+        await sendSmsCode(resetPhone.trim());
+        setResetMode('code');
+      } else {
+        // Local-only mode: can't send SMS, show instruction
+        Alert.alert(t('forgot_pin_title'), 'SMS verification requires Supabase to be configured. Please contact support.');
+        setResetMode('');
       }
-      if (!foundUser) {
-        const localUser = await getUser();
-        if (localUser && localUser.phone === resetPhone.trim()) foundUser = localUser;
-      }
-      if (!foundUser) {
-        Alert.alert(t('forgot_pin_title'), t('forgot_pin_no_account'));
-        setResetting(false);
-        return;
-      }
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      setGeneratedCode(code);
-      setResetMode('code');
-    } catch (e) { Alert.alert(t('error'), e.message); }
-    finally { setResetting(false); }
+    } catch (e) {
+      Alert.alert(t('error'), e.message);
+    } finally { setResetting(false); }
   }
 
-  function handleResetCode() {
-    if (codeInput !== generatedCode) {
+  async function handleResetCode() {
+    if (!codeInput.trim()) {
       Alert.alert(t('forgot_pin_title'), t('forgot_pin_code_wrong'));
       return;
     }
-    setResetMode('newPin');
+    setResetting(true);
+    try {
+      if (sbConfigured()) {
+        // Verify code via Supabase Edge Function + update password
+        const newPw = await generateRandomPassword();
+        await verifySmsCode(resetPhone.trim(), codeInput.trim(), newPw);
+        await storeSupabasePassword(newPw);
+        setResetMode('newPin');
+      }
+    } catch (e) {
+      Alert.alert(t('forgot_pin_title'), e.message || t('forgot_pin_code_wrong'));
+    } finally { setResetting(false); }
   }
 
   async function handleResetPin() {
@@ -342,17 +360,24 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       const localUser = await getUser();
       const updated = { ...(localUser || {}), pin: newPin };
       await saveUser(updated);
+
+      // Update PIN hash in SecureStore
+      const newHash = await hashPin(newPin);
+      await storePinHash(newHash);
+
+      // Update Supabase auth password to match new PIN hash
       if (sbConfigured() && resetUid) {
-        const sbClient = getSupabaseClient();
-        if (sbClient) {
-          await sbClient.from('users').update({
-            data: { ...updated, updatedAt: new Date().toISOString() },
-          }).eq('id', resetUid);
-          try {
-            const { updateUserPassword } = await import('../utils/supabase');
-            await updateUserPassword(newPin, newPin);
-          } catch (_) {}
-        }
+        try {
+          const newPw = await generateRandomPassword();
+          await storeSupabasePassword(newPw);
+          // Re-register with new PIN hash for Supabase auth
+          const sbClient = getSupabaseClient();
+          if (sbClient) {
+            await sbClient.from('users').update({
+              data: { ...updated, updatedAt: new Date().toISOString() },
+            }).eq('id', resetUid);
+          }
+        } catch (_) {}
       }
       Alert.alert(t('success'), t('forgot_pin_success'));
       setResetMode('');
@@ -474,12 +499,14 @@ export default function AuthScreen({ onAuthSuccess, route }) {
                       <Text style={styles.cardTitle}>{t('forgot_pin_title')}</Text>
                       <Text style={styles.cardSub}>{t('forgot_pin_code_sent')}</Text>
                       <View style={{ backgroundColor: COLORS.surfaceLow, borderRadius: RADIUS.lg, padding: 16, alignItems: 'center', marginBottom: 16 }}>
-                        <Text style={{ fontSize: 11, fontFamily: FONT.body, color: COLORS.outline, marginBottom: 4 }}>{t('forgot_pin_code_hint')}</Text>
-                        <Text style={{ fontSize: 28, fontFamily: FONT.bold, color: COLORS.primary, letterSpacing: 4 }}>{generatedCode}</Text>
+                        <MaterialCommunityIcons name="message-text-lock" size={32} color={COLORS.primary} />
+                        <Text style={{ fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, marginTop: 8, textAlign: 'center' }}>
+                          {t('forgot_pin_code_hint')}
+                        </Text>
                       </View>
                       <FormInput label={t('forgot_pin_code_label')} value={codeInput} onChangeText={setCodeInput} placeholder="------" keyboardType="number-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
-                      <TouchableOpacity style={styles.primaryBtn} onPress={handleResetCode}>
-                        <Text style={styles.primaryBtnText}>{t('forgot_pin_next')}</Text>
+                      <TouchableOpacity style={styles.primaryBtn} onPress={handleResetCode} disabled={resetting}>
+                        {resetting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('forgot_pin_next')}</Text>}
                       </TouchableOpacity>
                     </>
                   )}

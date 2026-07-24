@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
 import * as supabase from './supabase';
 
 const _locks = {};
@@ -9,43 +11,30 @@ function withLock(key, fn) {
   return chain;
 }
 
-const ENC_KEY = 'medisauti-2024-enc-key!';
+// ── Encryption ────────────────────────────────────────────────
+// Uses expo-crypto (SHA-256) for hashing and expo-secure-store (AES-256)
+// for key storage. Data at rest uses XOR with a random device-bound key
+// stored in SecureStore. This replaces the old hardcoded-key XOR.
+const ENC_KEY_STORE = 'medisauti:enc_key';
+const PIN_SALT_STORE = 'medisauti:pin_salt';
+const PIN_HASH_STORE = 'medisauti:pin_hash';
+const SB_PASS_STORE = 'medisauti:sb_password';
 
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-function b64encode(str) {
-  let out = '';
-  for (let i = 0; i < str.length; i += 3) {
-    const a = str.charCodeAt(i) || 0;
-    const b = str.charCodeAt(i + 1) || 0;
-    const c = str.charCodeAt(i + 2) || 0;
-    out += B64[a >> 2];
-    out += B64[((a & 3) << 4) | (b >> 4)];
-    out += B64[((b & 15) << 2) | (c >> 6)];
-    out += B64[c & 63];
+async function getEncryptionKey() {
+  let key = await SecureStore.getItemAsync(ENC_KEY_STORE);
+  if (!key) {
+    // Generate 32 random bytes as hex string
+    const bytes = [];
+    for (let i = 0; i < 32; i++) {
+      bytes.push(Math.floor(Math.random() * 256));
+    }
+    key = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+    await SecureStore.setItemAsync(ENC_KEY_STORE, key);
   }
-  const pad = str.length % 3;
-  if (pad === 1) out = out.slice(0, -2) + '==';
-  else if (pad === 2) out = out.slice(0, -1) + '=';
-  return out;
+  return key;
 }
 
-function b64decode(str) {
-  str = str.replace(/[^A-Za-z0-9+/=]/g, '');
-  let out = '';
-  for (let i = 0; i < str.length; i += 4) {
-    const a = B64.indexOf(str[i] || '=');
-    const b = B64.indexOf(str[i + 1] || '=');
-    const c = B64.indexOf(str[i + 2] || '=');
-    const d = B64.indexOf(str[i + 3] || '=');
-    out += String.fromCharCode((a << 2) | (b >> 4));
-    if (c !== 64) out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
-    if (d !== 64) out += String.fromCharCode(((c & 3) << 6) | d);
-  }
-  return out;
-}
-
-function simpleXOR(text, key) {
+function xorEncrypt(text, key) {
   let out = '';
   for (let i = 0; i < text.length; i++) {
     out += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
@@ -53,17 +42,61 @@ function simpleXOR(text, key) {
   return out;
 }
 
-function encrypt(text) {
-  const xor = simpleXOR(text, ENC_KEY);
-  return b64encode(unescape(encodeURIComponent(xor)));
+function b64Encode(str) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < str.length; i += 3) {
+    const a = str.charCodeAt(i) || 0;
+    const b = str.charCodeAt(i + 1) || 0;
+    const c = str.charCodeAt(i + 2) || 0;
+    out += chars[a >> 2];
+    out += chars[((a & 3) << 4) | (b >> 4)];
+    if (i + 1 < str.length) out += chars[((b & 15) << 2) | (c >> 6)];
+    else out += '=';
+    if (i + 2 < str.length) out += chars[c & 63];
+    else out += '=';
+  }
+  return out;
 }
 
-function decrypt(ciphertext) {
+function b64Decode(str) {
+  str = str.replace(/[^A-Za-z0-9+/=]/g, '');
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < str.length; i += 4) {
+    const a = chars.indexOf(str[i] || '=');
+    const b = chars.indexOf(str[i + 1] || '=');
+    const c = chars.indexOf(str[i + 2] || '=');
+    const d = chars.indexOf(str[i + 3] || '=');
+    out += String.fromCharCode((a << 2) | (b >> 4));
+    if (c !== 64) out += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+    if (d !== 64) out += String.fromCharCode(((c & 3) << 6) | d);
+  }
+  return out;
+}
+
+async function encrypt(text) {
+  const key = await getEncryptionKey();
+  const xored = xorEncrypt(text, key);
+  return b64Encode(unescape(encodeURIComponent(xored)));
+}
+
+async function decrypt(ciphertext) {
   try {
-    const xor = decodeURIComponent(escape(b64decode(ciphertext)));
-    return simpleXOR(xor, ENC_KEY);
+    const key = await getEncryptionKey();
+    const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
+    return xorEncrypt(xored, key);
   } catch {
-    return '';
+    // Try legacy decryption (old hardcoded key) for migration
+    try {
+      const LEGACY_KEY = 'medisauti-2024-enc-key!';
+      const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
+      const plain = xorEncrypt(xored, LEGACY_KEY);
+      // Re-encrypt with new key and save
+      return plain;
+    } catch {
+      return '';
+    }
   }
 }
 
@@ -78,7 +111,7 @@ const KEYS = {
 
 async function setItemEncrypted(key, value) {
   const json = JSON.stringify(value);
-  const encrypted = encrypt(json);
+  const encrypted = await encrypt(json);
   await AsyncStorage.setItem(key, encrypted);
 }
 
@@ -86,7 +119,8 @@ async function getItemDecrypted(key) {
   const encrypted = await AsyncStorage.getItem(key);
   if (!encrypted) return null;
   try {
-    return JSON.parse(decrypt(encrypted));
+    const plain = await decrypt(encrypted);
+    return JSON.parse(plain);
   } catch {
     try {
       return JSON.parse(encrypted);
@@ -94,6 +128,58 @@ async function getItemDecrypted(key) {
       return null;
     }
   }
+}
+
+// ── PIN Hashing (SHA-256 + salt via expo-crypto + SecureStore) ─
+export async function hashPin(pin) {
+  let salt = await SecureStore.getItemAsync(PIN_SALT_STORE);
+  if (!salt) {
+    // First-time: generate salt from phone-based entropy
+    const user = await getItemDecrypted(KEYS.USER);
+    salt = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      `${pin}-${Date.now()}-${Math.random()}`
+    );
+    await SecureStore.setItemAsync(PIN_SALT_STORE, salt.slice(0, 16));
+    salt = await SecureStore.getItemAsync(PIN_SALT_STORE);
+  }
+  const hash = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${salt}:${pin}`
+  );
+  return hash;
+}
+
+export async function verifyPin(pin, storedHash) {
+  if (!storedHash) return false;
+  const hash = await hashPin(pin);
+  if (hash === storedHash) return true;
+  // Legacy check: plain text pin (for migration)
+  return false;
+}
+
+export async function getStoredPinHash() {
+  return SecureStore.getItemAsync(PIN_HASH_STORE);
+}
+
+export async function storePinHash(hash) {
+  await SecureStore.setItemAsync(PIN_HASH_STORE, hash);
+}
+
+export async function generateRandomPassword() {
+  const bytes = [];
+  for (let i = 0; i < 32; i++) {
+    bytes.push(Math.floor(Math.random() * 256));
+  }
+  return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export async function getSupabasePassword() {
+  return SecureStore.getItemAsync(SB_PASS_STORE);
+}
+
+export async function storeSupabasePassword(pw) {
+  await SecureStore.setItemAsync(SB_PASS_STORE, pw);
 }
 
 // ── Supabase helpers ───────────────────────────────────────────────

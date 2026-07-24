@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 
 function generateId() {
   const t = Date.now().toString(36);
@@ -43,8 +44,10 @@ function makeEmail(phone) {
   return `${digits}@medisauti.app`;
 }
 
-function makePassword(pin) {
-  return `md${pin}`;
+async function makePassword(pinOrHash) {
+  // Use SHA-256 hash as Supabase password — never store weak passwords
+  if (pinOrHash.length === 64) return pinOrHash; // already a hash
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `ms:${pinOrHash}`);
 }
 
 function getAuthInstance() {
@@ -61,7 +64,7 @@ function getClient() {
 
 async function registerUser(phone, pin, userData) {
   const email = makeEmail(phone);
-  const password = makePassword(pin);
+  const password = await makePassword(pin);
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) throw error;
   const uid = data.user.id;
@@ -85,7 +88,7 @@ async function registerUser(phone, pin, userData) {
 
 async function loginUser(phone, pin) {
   const email = makeEmail(phone);
-  const password = makePassword(pin);
+  const password = await makePassword(pin);
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data.user.id;
@@ -107,8 +110,39 @@ function onAuthChanged(callback) {
 }
 
 async function updateUserPassword(currentPin, newPin) {
-  const { error } = await supabase.auth.updateUser({ password: makePassword(newPin) });
+  const password = await makePassword(newPin);
+  const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;
+}
+
+// ── Edge Functions (SMS verification) ─────────────────────────
+async function sendSmsCode(phone) {
+  if (!supabaseUrl) throw new Error('Supabase not configured');
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token || supabaseAnonKey}`,
+      apikey: supabaseAnonKey,
+    },
+    body: JSON.stringify({ phone }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to send SMS');
+  return json;
+}
+
+async function verifySmsCode(phone, code, newPassword) {
+  if (!supabaseUrl) throw new Error('Supabase not configured');
+  const res = await fetch(`${supabaseUrl}/functions/v1/verify-sms`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: supabaseAnonKey },
+    body: JSON.stringify({ phone, code, new_password: newPassword }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Verification failed');
+  return json;
 }
 
 async function sbGetUser(uid) {
@@ -302,6 +336,7 @@ async function sbDeleteAllUserData(uid) {
 export {
   isConfigured, init,
   getAuthInstance, getCurrentUser, getClient, registerUser, loginUser, logoutUser, onAuthChanged, updateUserPassword,
+  sendSmsCode, verifySmsCode,
   sbGetUser, sbSaveUser,
   sbGetPrescriptions, sbSavePrescription, sbDeletePrescription,
   sbGetLogs, sbLogDose,
