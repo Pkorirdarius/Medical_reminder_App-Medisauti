@@ -130,10 +130,16 @@ export async function getIsRegistered() {
 }
 
 // ── Prescriptions ───────────────────────────────────────────────────
-export async function getPrescriptions() {
+export async function getPrescriptions(targetUid) {
   if (await isFB()) {
-    const data = await supabase.fbGetPrescriptions(getUid());
-    if (data && data.length > 0) return data;
+    const uid = targetUid || getUid();
+    if (targetUid) {
+      const data = await supabase.fbGetPatientPrescriptions(targetUid);
+      if (data && data.length > 0) return data;
+    } else {
+      const data = await supabase.fbGetPrescriptions(getUid());
+      if (data && data.length > 0) return data;
+    }
   }
   return (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
 }
@@ -162,10 +168,15 @@ export async function deletePrescription(id) {
 }
 
 // ── Adherence Logs ──────────────────────────────────────────────────
-export async function getLogs() {
+export async function getLogs(targetUid) {
   if (await isFB()) {
-    const data = await supabase.fbGetLogs(getUid());
-    if (data && data.length > 0) return data;
+    if (targetUid) {
+      const data = await supabase.fbGetPatientLogs(targetUid);
+      if (data && data.length > 0) return data;
+    } else {
+      const data = await supabase.fbGetLogs(getUid());
+      if (data && data.length > 0) return data;
+    }
   }
   return (await getItemDecrypted(KEYS.ADHERENCE)) || [];
 }
@@ -187,8 +198,8 @@ export async function logDose(prescriptionId, status, scheduledTime) {
 }
 
 // ── Analytics (computed from local logs, always use local) ──────────
-export async function calcAdherence(days = 30) {
-  const logs = await getLogs();
+export async function calcAdherence(days = 30, targetUid) {
+  const logs = await getLogs(targetUid);
   const since = new Date();
   since.setDate(since.getDate() - days);
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
@@ -199,8 +210,8 @@ export async function calcAdherence(days = 30) {
   return { rate, taken, missed, total };
 }
 
-export async function getDailyStreak(days = 7) {
-  const logs = await getLogs();
+export async function getDailyStreak(days = 7, targetUid) {
+  const logs = await getLogs(targetUid);
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
@@ -218,8 +229,8 @@ export async function getDailyStreak(days = 7) {
   return result;
 }
 
-export async function getPerMedicationAdherence(days = 30) {
-  const [logs, prescriptions] = await Promise.all([getLogs(), getPrescriptions()]);
+export async function getPerMedicationAdherence(days = 30, targetUid) {
+  const [logs, prescriptions] = await Promise.all([getLogs(targetUid), getPrescriptions(targetUid)]);
   const since = new Date();
   since.setDate(since.getDate() - days);
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
@@ -240,8 +251,8 @@ export async function getPerMedicationAdherence(days = 30) {
   return Object.values(medMap).map(m => ({ ...m, rate: m.total > 0 ? Math.round((m.taken / m.total) * 100) : 0 }));
 }
 
-export async function getMissedDosePatterns(days = 30) {
-  const logs = await getLogs();
+export async function getMissedDosePatterns(days = 30, targetUid) {
+  const logs = await getLogs(targetUid);
   const since = new Date();
   since.setDate(since.getDate() - days);
   const patterns = { morning: 0, afternoon: 0, evening: 0, night: 0 };
@@ -256,8 +267,8 @@ export async function getMissedDosePatterns(days = 30) {
   return patterns;
 }
 
-export async function getCurrentStreak() {
-  const logs = await getLogs();
+export async function getCurrentStreak(targetUid) {
+  const logs = await getLogs(targetUid);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let streak = 0;
@@ -295,8 +306,8 @@ export async function getBestStreak(days = 90) {
   return best;
 }
 
-export async function getAdherenceTrend(days = 30) {
-  const logs = await getLogs();
+export async function getAdherenceTrend(days = 30, targetUid) {
+  const logs = await getLogs(targetUid);
   const since = new Date();
   since.setDate(since.getDate() - days);
   const recent = logs.filter(l => new Date(l.loggedAt) >= since);
@@ -366,10 +377,36 @@ export async function getMyDoctor() {
 export async function setMyDoctor(doctor) {
   await setItemEncrypted(KEYS.MY_DOCTOR, doctor);
   if (await isFB()) {
-    await supabase.fbSetMyDoctor(getUid(), doctor);
+    let doctorUid = doctor?.uid || null;
+    if (!doctorUid && doctor?.phone) {
+      try {
+        const found = await supabase.fbGetUserByPhone(doctor.phone);
+        if (found?.uid) doctorUid = found.uid;
+      } catch (_) {}
+    }
+    await supabase.fbSetMyDoctor(getUid(), doctor, doctorUid);
   } else if (!doctor) {
     await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
   }
+}
+
+export async function getDoctorPatients() {
+  const u = await getUser();
+  if (!u || u.role !== 'doctor') return [];
+  let doctorUid = u.uid || getUid();
+  if (!doctorUid && u.phone && await isFB()) {
+    try {
+      const found = await supabase.fbGetUserByPhone(u.phone);
+      if (found?.uid) doctorUid = found.uid;
+    } catch (_) {}
+  }
+  if (!doctorUid) return [];
+  if (await isFB()) {
+    try {
+      return await supabase.fbGetDoctorPatients(doctorUid);
+    } catch (_) {}
+  }
+  return [];
 }
 
 // ── Condition Presets ───────────────────────────────────────────────

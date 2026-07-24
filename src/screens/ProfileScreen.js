@@ -9,7 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, saveUser, clearAllData, syncConditionPrescriptions } from '../utils/storage';
+import { getUser, saveUser, clearUserData, syncConditionPrescriptions } from '../utils/storage';
 import { isConfigured as sbConfigured, updateUserPassword as sbUpdatePin } from '../utils/supabase';
 import { cancelAllReminders, requestNotificationPermission, getNotificationPermissionStatus, sendTestNotification, saveNotificationSound, getNotificationSound, SOUND_OPTIONS, speakReminder, scheduleReminder } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
@@ -156,8 +156,7 @@ export default function ProfileScreen({ onLogout }) {
       {
         text: t('btn_logout'), style: 'destructive',
         onPress: async () => {
-          await cancelAllReminders();
-          await clearAllData();
+          try { await cancelAllReminders(); } catch (_) {}
           if (onLogout) {
             onLogout();
           } else {

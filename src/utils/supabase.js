@@ -230,12 +230,52 @@ async function fbGetMyDoctor(uid) {
   return data?.data || null;
 }
 
-async function fbSetMyDoctor(uid, doctor) {
+async function fbGetDoctorPatients(doctorUid) {
+  if (!supabase) return [];
+  const { data } = await supabase.from('my_doctor').select('*').eq('doctor_uid', doctorUid);
+  if (!data || data.length === 0) return [];
+  const patientUids = data.map(r => r.user_id);
+  const patients = [];
+  for (const puid of patientUids) {
+    const { data: uData } = await supabase.from('users').select('*').eq('id', puid).maybeSingle();
+    if (uData) {
+      patients.push({ uid: puid, ...uData.data, phone: uData.phone });
+    }
+  }
+  return patients;
+}
+
+async function fbGetUserByPhone(phone) {
+  if (!supabase) return null;
+  const { data } = await supabase.from('users').select('*').eq('phone', phone).maybeSingle();
+  if (!data) return null;
+  return { uid: data.id, ...data.data, phone: data.phone };
+}
+
+async function fbGetPatientPrescriptions(patientUid) {
+  if (!supabase) return [];
+  const { data } = await supabase.from('prescriptions').select('*').eq('user_id', patientUid);
+  return (data || []).map(r => ({ id: r.id, ...r.data }));
+}
+
+async function fbGetPatientLogs(patientUid) {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from('adherence_logs')
+    .select('*')
+    .eq('user_id', patientUid)
+    .order('logged_at', { ascending: false })
+    .limit(500);
+  return (data || []).map(r => ({ id: r.id, ...r.data }));
+}
+
+async function fbSetMyDoctor(uid, doctor, doctorUid) {
   if (!supabase) return;
   if (doctor) {
     await supabase.from('my_doctor').upsert({
       id: uid,
       user_id: uid,
+      doctor_uid: doctorUid || null,
       data: doctor,
     });
   } else {
@@ -267,6 +307,8 @@ export {
   fbGetDoctors, fbSaveDoctor,
   fbGetSchedules, fbSaveSchedule,
   fbGetMyDoctor, fbSetMyDoctor,
+  fbGetDoctorPatients, fbGetUserByPhone,
+  fbGetPatientPrescriptions, fbGetPatientLogs,
   fbGetConditionPresets,
   fbDeleteAllUserData,
 };

@@ -212,8 +212,12 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     try {
       if (sbConfigured()) {
         const uid = await sbLogin(loginPhone, loginPin);
+        const previousUser = await getUser();
+        if (previousUser && previousUser.phone && previousUser.phone !== loginPhone) {
+          await clearUserData();
+        }
         let remoteUser = await getUser();
-        if (!remoteUser) {
+        if (!remoteUser || (previousUser && previousUser.phone !== loginPhone)) {
           const sbClient = getSupabaseClient();
           if (sbClient) {
             const { data } = await sbClient.from('users').select('*').eq('id', uid).maybeSingle();

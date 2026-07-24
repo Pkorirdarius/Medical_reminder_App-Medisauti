@@ -320,7 +320,7 @@ export default function PrescriptionScreen({ route }) {
       {loading ? (
         <ActivityIndicator style={{ marginTop: 60, flex: 1 }} color={COLORS.primary} />
       ) : (
-        <>
+        <View style={{ flex: 1 }}>
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7} accessibilityLabel={t('add_medication')} accessibilityRole="button">
             <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
             <Text style={styles.addBtnText}>{t('add_medication')}</Text>
@@ -339,7 +339,7 @@ export default function PrescriptionScreen({ route }) {
           </View>
 
           {prescriptions.length === 0 ? (
-            <View style={styles.emptyState}>
+            <View style={[styles.emptyState, { flex: 1 }]}>
               <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
               <Text style={styles.emptyTitle}>{t('empty_medications_title')}</Text>
               <Text style={styles.emptySub}>{t('empty_medications_sub')}</Text>
@@ -357,7 +357,7 @@ export default function PrescriptionScreen({ route }) {
               ))}
             </ScrollView>
           )}
-        </>
+        </View>
       )}
 
       {/* ── Add/Edit Form Modal ── */}

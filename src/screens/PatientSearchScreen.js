@@ -1,49 +1,39 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, Modal,
+  TextInput, ActivityIndicator, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { RADIUS, FONT } from '../utils/constants';
-import { getPrescriptions } from '../utils/storage';
+import { getUser, getDoctorPatients, getPrescriptions } from '../utils/storage';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
+const CONDITION_ICONS = {
+  Kisukari: 'water',
+  'Shinikizo la damu': 'heart-pulse',
+  VVU: 'shield-check',
+  Diabetes: 'water',
+  'Blood Pressure': 'heart-pulse',
+  HIV: 'shield-check',
+};
+
 const CONDITION_KEYWORDS = [
-  { key: 'diabetes', icons: ['metformin', 'insulin', 'glibenclamide', 'gliclazide'], labelKey: 'condition_diabetes' },
-  { key: 'bp', icons: ['amlodipine', 'enalapril', 'losartan', 'hydrochlorothiazide', 'nifedipine'],
-    labelKey: 'condition_bp' },
-  { key: 'hiv', icons: ['tenofovir', 'lamivudine', 'dolutegravir', 'tld', 'efavirenz', 'nevirapine'],
-    labelKey: 'condition_hiv' },
+  { key: 'diabetes', matches: ['kisukari', 'diabetes', 'metformin', 'insulin'] },
+  { key: 'bp', matches: ['shinikizo', 'damu', 'blood pressure', 'bp', 'amlodipine'] },
+  { key: 'hiv', matches: ['hiv', 'vvu', 'tenofovir', 'tld'] },
 ];
 
-const CONDITION_ORDER = ['diabetes', 'bp', 'hiv', 'other'];
-
-function inferCondition(drugName) {
-  const name = (drugName || '').toLowerCase();
+function inferCondition(condition) {
+  const c = (condition || '').toLowerCase();
   for (const group of CONDITION_KEYWORDS) {
-    if (group.icons.some(icon => name.includes(icon))) return group.key;
+    if (group.matches.some(m => c.includes(m))) return group.key;
   }
   return 'other';
 }
-
-function conditionQueryToKey(query) {
-  const q = query.toLowerCase();
-  if (q.includes('kisukari') || q.includes('diabetes')) return 'diabetes';
-  if (q.includes('shinikizo') || q.includes('damu') || q.includes('blood') || q.includes('pressure') || q === 'bp') return 'bp';
-  if (q.includes('hiv') || q.includes('vvu')) return 'hiv';
-  return null;
-}
-
-const CONDITION_ICONS_MAP = {
-  diabetes: 'water',
-  bp: 'heart-pulse',
-  hiv: 'shield-check',
-  other: 'medical-bag',
-};
 
 const CONDITION_COLORS = {
   diabetes: { bg: '#E1F5EE', icon: '#1D9E75' },
@@ -52,56 +42,62 @@ const CONDITION_COLORS = {
   other: { bg: '#F1EFE8', icon: '#5F5E5A' },
 };
 
+const CONDITION_ICONS_MAP = { diabetes: 'water', bp: 'heart-pulse', hiv: 'shield-check', other: 'medical-bag' };
+
 export default function PatientSearchScreen() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation();
   const { t } = useLanguage();
-  const { COLORS, isDark } = useTheme();
+  const { COLORS } = useTheme();
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
-  const [prescriptions, setPrescriptions] = useState([]);
+  const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const [selectedRx, setSelectedRx] = useState(null);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [selectedRxList, setSelectedRxList] = useState([]);
+  const [loadingRx, setLoadingRx] = useState(false);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
   async function loadData() {
     try {
-      const rx = await getPrescriptions();
-      setPrescriptions(rx);
+      const u = await getUser();
+      if (!u || u.role !== 'doctor') { setLoading(false); return; }
+      const patientsList = await getDoctorPatients();
+      setPatients(patientsList);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
+  }
+
+  async function handleViewPatient(patient) {
+    setSelectedPatient(patient);
+    setLoadingRx(true);
+    try {
+      const rx = await getPrescriptions(patient.uid);
+      setSelectedRxList(rx);
+    } catch (e) { console.error(e); }
+    finally { setLoadingRx(false); }
   }
 
   const grouped = useMemo(() => {
     const groups = { diabetes: [], bp: [], hiv: [], other: [] };
     const query = search.toLowerCase().trim();
 
-    for (const rx of prescriptions) {
-      const cond = inferCondition(rx.drugName);
+    for (const p of patients) {
+      const cond = inferCondition(p.condition);
       if (activeFilter !== 'all' && cond !== activeFilter) continue;
       if (query) {
-        const drugMatch = rx.drugName.toLowerCase().includes(query);
-        const condKeyMatch = cond.includes(query);
-        const queryCondKey = conditionQueryToKey(query);
-        const condNameMatch = queryCondKey && cond === queryCondKey;
-        if (!drugMatch && !condKeyMatch && !condNameMatch) continue;
+        const nameMatch = (p.name || '').toLowerCase().includes(query);
+        const condMatch = (p.condition || '').toLowerCase().includes(query);
+        if (!nameMatch && !condMatch) continue;
       }
-      groups[cond].push(rx);
+      groups[cond].push(p);
     }
     return groups;
-  }, [prescriptions, search, activeFilter]);
+  }, [patients, search, activeFilter]);
 
   const totalShown = Object.values(grouped).reduce((s, arr) => s + arr.length, 0);
-
-  const condLabelMap = {
-    diabetes: 'condition_diabetes',
-    bp: 'condition_bp',
-    hiv: 'condition_hiv',
-    other: 'condition_other',
-  };
 
   if (loading) {
     return (
@@ -118,7 +114,6 @@ export default function PatientSearchScreen() {
         <Text style={styles.headerTitle}>{t('header_search_patients')}</Text>
       </View>
 
-      {/* Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: COLORS.surfaceLow }]}>
         <MaterialCommunityIcons name="magnify" size={20} color={COLORS.outline} />
         <TextInput
@@ -135,7 +130,6 @@ export default function PatientSearchScreen() {
         )}
       </View>
 
-      {/* Condition Filter Pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
         {[
           { key: 'all', label: t('condition_all'), icon: 'view-grid' },
@@ -148,23 +142,15 @@ export default function PatientSearchScreen() {
           return (
             <TouchableOpacity
               key={key}
-              style={[styles.pill, {
-                backgroundColor: isActive ? COLORS.primary : COLORS.surfaceLow,
-              }]}
+              style={[styles.pill, { backgroundColor: isActive ? COLORS.primary : COLORS.surfaceLow }]}
               onPress={() => setActiveFilter(key)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons
-                name={icon}
-                size={14}
-                color={isActive ? '#fff' : COLORS.outline}
-              />
+              <MaterialCommunityIcons name={icon} size={14} color={isActive ? '#fff' : COLORS.outline} />
               <Text style={[styles.pillText, {
                 color: isActive ? '#fff' : COLORS.onSurfaceVariant,
                 fontFamily: isActive ? FONT.bodySemiBold : FONT.body,
-              }]}>
-                {label}
-              </Text>
+              }]}>{label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -174,46 +160,37 @@ export default function PatientSearchScreen() {
         {totalShown === 0 ? (
           <View style={styles.emptyWrap}>
             <MaterialCommunityIcons name="account-off-outline" size={48} color={COLORS.outline} />
-            <Text style={[styles.emptyText, { color: COLORS.onSurface }]}>{t('no_search_results')}</Text>
+            <Text style={[styles.emptyText, { color: COLORS.onSurface }]}>
+              {patients.length === 0 ? t('no_patients_assigned') : t('no_search_results')}
+            </Text>
           </View>
         ) : (
-          CONDITION_ORDER.map(cond => {
-            const rxs = grouped[cond];
-            if (rxs.length === 0) return null;
-            const colors = CONDITION_COLORS[cond];
-            const dColors = CONDITION_COLORS.other;
-            const cc = isDark ? colors : colors;
+          Object.entries({ diabetes: 'condition_diabetes', bp: 'condition_bp', hiv: 'condition_hiv', other: 'condition_other' }).map(([cond, labelKey]) => {
+            const pts = grouped[cond];
+            if (pts.length === 0) return null;
+            const cc = CONDITION_COLORS[cond];
             return (
               <View key={cond} style={styles.groupCard}>
                 <View style={[styles.groupHeader, { backgroundColor: cc.bg }]}>
                   <MaterialCommunityIcons name={CONDITION_ICONS_MAP[cond]} size={16} color={cc.icon} />
-                  <Text style={[styles.groupTitle, { color: cc.icon }]}>{t(condLabelMap[cond])}</Text>
+                  <Text style={[styles.groupTitle, { color: cc.icon }]}>{t(labelKey)}</Text>
                   <View style={[styles.groupCount, { backgroundColor: cc.icon + '30' }]}>
-                    <Text style={[styles.groupCountText, { color: cc.icon }]}>{rxs.length}</Text>
+                    <Text style={[styles.groupCountText, { color: cc.icon }]}>{pts.length}</Text>
                   </View>
                 </View>
-                {rxs.map((rx, i) => (
+                {pts.map((p, i) => (
                   <TouchableOpacity
-                    key={rx.id || i}
-                    style={[styles.rxRow, { borderBottomWidth: i < rxs.length - 1 ? 0.5 : 0, borderBottomColor: COLORS.surfaceHigh }]}
+                    key={p.uid || i}
+                    style={[styles.rxRow, { borderBottomWidth: i < pts.length - 1 ? 0.5 : 0, borderBottomColor: COLORS.surfaceHigh }]}
                     activeOpacity={0.6}
-                    onPress={() => setSelectedRx(rx)}
+                    onPress={() => handleViewPatient(p)}
                   >
                     <View style={[styles.rxIcon, { backgroundColor: COLORS.primary + '12' }]}>
-                      <MaterialCommunityIcons name="pill" size={16} color={COLORS.primary} />
+                      <MaterialCommunityIcons name="account" size={16} color={COLORS.primary} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.rxName}>{rx.drugName} {rx.dosage}</Text>
-                      <Text style={styles.rxDetail}>{rx.frequency} · {rx.times.join(', ')}</Text>
-                      <View style={styles.rxMeta}>
-                        <MaterialCommunityIcons name={rx.source === 'doctor' ? 'stethoscope' : 'pencil'} size={11} color={COLORS.outline} />
-                        <Text style={styles.rxMetaText}>{rx.source === 'doctor' ? t('source_doctor') : t('source_manual')}</Text>
-                        {rx.active !== false && (
-                          <View style={[styles.statusBadge, { backgroundColor: COLORS.goal[50] }]}>
-                            <Text style={[styles.statusText, { color: COLORS.goal[600] }]}>{t('badge_active')}</Text>
-                          </View>
-                        )}
-                      </View>
+                      <Text style={styles.rxName}>{p.name}</Text>
+                      <Text style={styles.rxDetail}>{p.age || '--'} yrs · {p.condition || ''}</Text>
                     </View>
                     <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.outline} />
                   </TouchableOpacity>
@@ -224,49 +201,48 @@ export default function PatientSearchScreen() {
         )}
       </ScrollView>
 
-      {/* ── Prescription Detail Modal ── */}
-      <Modal visible={!!selectedRx} transparent animationType="fade" onRequestClose={() => setSelectedRx(null)}>
+      <Modal visible={!!selectedPatient} transparent animationType="fade" onRequestClose={() => { setSelectedPatient(null); setSelectedRxList([]); }}>
         <View style={styles.detailOverlay}>
           <View style={styles.detailCard}>
             <View style={styles.detailHeader}>
               <View style={[styles.detailIcon, { backgroundColor: COLORS.primary + '15' }]}>
-                <MaterialCommunityIcons name="pill" size={24} color={COLORS.primary} />
+                <MaterialCommunityIcons name="account" size={24} color={COLORS.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.detailName}>{selectedRx?.drugName} {selectedRx?.dosage}</Text>
-                <Text style={styles.detailSub}>{selectedRx?.frequency}</Text>
+                <Text style={styles.detailName}>{selectedPatient?.name}</Text>
+                <Text style={styles.detailSub}>{selectedPatient?.age || '--'} yrs · {selectedPatient?.condition || ''}</Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedRx(null)}>
+              <TouchableOpacity onPress={() => { setSelectedPatient(null); setSelectedRxList([]); }}>
                 <MaterialCommunityIcons name="close" size={22} color={COLORS.outline} />
               </TouchableOpacity>
             </View>
-            <View style={styles.detailBody}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('label_dosage_form')}</Text>
-                <Text style={styles.detailValue}>{t('form_' + (selectedRx?.dosageForm || 'tablet'))}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('label_times')}</Text>
-                <Text style={styles.detailValue}>{selectedRx?.times?.join(', ')}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('label_source')}</Text>
-                <Text style={styles.detailValue}>{selectedRx?.source === 'doctor' ? t('source_doctor') : t('source_manual')}</Text>
-              </View>
-              {selectedRx?.notes ? (
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{t('label_notes')}</Text>
-                  <Text style={styles.detailValue}>{selectedRx?.notes}</Text>
-                </View>
-              ) : null}
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{t('badge_active')}</Text>
-                <View style={[styles.detailBadge, { backgroundColor: selectedRx?.active !== false ? COLORS.green[50] : COLORS.red[50] }]}>
-                  <Text style={[styles.detailBadgeText, { color: selectedRx?.active !== false ? COLORS.green[400] : COLORS.red[400] }]}>
-                    {selectedRx?.active !== false ? t('badge_active') : t('status_missed')}
-                  </Text>
-                </View>
-              </View>
+            <View style={{ padding: 16 }}>
+              <Text style={{ fontSize: 13, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface, marginBottom: 8 }}>
+                {t('all_medications')} ({selectedRxList.length})
+              </Text>
+              {loadingRx ? (
+                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 16 }} />
+              ) : selectedRxList.length === 0 ? (
+                <Text style={{ fontSize: 12, fontFamily: FONT.body, color: COLORS.outline, textAlign: 'center', paddingVertical: 16 }}>
+                  {t('no_meds_added')}
+                </Text>
+              ) : (
+                selectedRxList.map((rx, i) => (
+                  <View key={rx.id || i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: i < selectedRxList.length - 1 ? 0.5 : 0, borderBottomColor: COLORS.surfaceHigh }}>
+                    <MaterialCommunityIcons name="pill" size={14} color={COLORS.primary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface }}>{rx.drugName} {rx.dosage}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: FONT.body, color: COLORS.outline }}>{rx.frequency} · {rx.times?.join(', ')}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: rx.source === 'doctor' ? COLORS.blue[50] : COLORS.surfaceLow }}>
+                      <MaterialCommunityIcons name={rx.source === 'doctor' ? 'stethoscope' : 'pencil'} size={10} color={rx.source === 'doctor' ? COLORS.blue[800] : COLORS.outline} />
+                      <Text style={{ fontSize: 8, fontFamily: FONT.bodySemiBold, color: rx.source === 'doctor' ? COLORS.blue[800] : COLORS.outline }}>
+                        {rx.source === 'doctor' ? t('source_doctor') : t('source_manual')}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         </View>
@@ -286,16 +262,12 @@ function getStyles(C) {
       zIndex: 10,
     },
     headerTitle:     { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5, flex: 1 },
-
-    /* Search */
     searchBar: {
       flexDirection: 'row', alignItems: 'center', gap: 8,
       marginHorizontal: 16, marginTop: 12,
       borderRadius: RADIUS.lg, paddingHorizontal: 12, height: 42,
     },
     searchInput:     { flex: 1, fontSize: 14, fontFamily: FONT.body, height: 42 },
-
-    /* Filter Pills */
     filterRow:       { marginTop: 12, marginBottom: 4 },
     pill: {
       flexDirection: 'row', alignItems: 'center', gap: 5,
@@ -303,8 +275,6 @@ function getStyles(C) {
       borderRadius: RADIUS.pill,
     },
     pillText:        { fontSize: 12 },
-
-    /* Groups */
     scrollContent:   { padding: 16, paddingBottom: 100, gap: 16 },
     groupCard: {
       backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, overflow: 'hidden',
@@ -317,8 +287,6 @@ function getStyles(C) {
     groupTitle:      { fontSize: 14, fontFamily: FONT.bodySemiBold, flex: 1 },
     groupCount:      { borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 1 },
     groupCountText:  { fontSize: 11, fontFamily: FONT.bodyBold },
-
-    /* Rx rows */
     rxRow: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
       paddingHorizontal: 14, paddingVertical: 12,
@@ -326,26 +294,13 @@ function getStyles(C) {
     rxIcon:          { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     rxName:          { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.onSurface },
     rxDetail:        { fontSize: 11, fontFamily: FONT.body, color: C.outline },
-    rxMeta:          { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-    rxMetaText:      { fontSize: 10, fontFamily: FONT.body, color: C.outline },
-    statusBadge:     { borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 1 },
-    statusText:      { fontSize: 9, fontFamily: FONT.bodySemiBold },
-
-    /* Empty */
     emptyWrap:       { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
     emptyText:       { fontSize: 14, fontFamily: FONT.body, color: C.outline, textAlign: 'center' },
-
     detailOverlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', padding: 32 },
-    detailCard:      { width: '100%', backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 12 },
+    detailCard:      { width: '100%', maxHeight: '80%', backgroundColor: C.surfaceLowest, borderRadius: RADIUS.xl, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 12 },
     detailHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 0.5, borderBottomColor: C.surfaceHigh },
     detailIcon:      { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     detailName:      { fontSize: 16, fontFamily: FONT.bodySemiBold, color: C.onSurface },
     detailSub:       { fontSize: 12, fontFamily: FONT.body, color: C.onSurfaceVariant, marginTop: 2 },
-    detailBody:      { padding: 16, gap: 12 },
-    detailRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    detailLabel:     { fontSize: 13, fontFamily: FONT.body, color: C.outline },
-    detailValue:     { fontSize: 13, fontFamily: FONT.bodySemiBold, color: C.onSurface },
-    detailBadge:     { borderRadius: RADIUS.pill, paddingHorizontal: 10, paddingVertical: 3 },
-    detailBadgeText: { fontSize: 12, fontFamily: FONT.bodySemiBold },
   });
 }

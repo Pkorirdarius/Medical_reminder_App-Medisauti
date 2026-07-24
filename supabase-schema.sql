@@ -48,6 +48,7 @@ CREATE TABLE schedules (
 CREATE TABLE my_doctor (
   id TEXT PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  doctor_uid UUID,
   data JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -67,6 +68,7 @@ CREATE INDEX idx_adherence_logs_logged_at ON adherence_logs(logged_at DESC);
 CREATE INDEX idx_schedules_user_id ON schedules(user_id);
 CREATE INDEX idx_doctors_phone ON doctors(phone);
 CREATE INDEX idx_my_doctor_user_id ON my_doctor(user_id);
+CREATE INDEX idx_my_doctor_doctor_uid ON my_doctor(doctor_uid);
 
 -- ── Row-Level Security ──────────────────────────────────────
 
@@ -97,6 +99,10 @@ CREATE POLICY "schedules_own" ON schedules
 -- My doctor: authenticated users can manage their own
 CREATE POLICY "my_doctor_own" ON my_doctor
   FOR ALL USING (auth.uid() = user_id);
+
+-- My doctor: doctors can read rows where they are the assigned doctor
+CREATE POLICY "my_doctor_doctor_read" ON my_doctor
+  FOR SELECT USING (auth.uid() = doctor_uid);
 
 -- Doctors: all authenticated users can read
 CREATE POLICY "doctors_read_all" ON doctors
