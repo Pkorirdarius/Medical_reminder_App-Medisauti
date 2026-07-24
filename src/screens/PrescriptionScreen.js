@@ -319,7 +319,13 @@ export default function PrescriptionScreen({ route }) {
       {loading ? (
         <ActivityIndicator style={{ marginTop: 60, flex: 1 }} color={COLORS.primary} />
       ) : (
-        <View style={{ flex: 1 }}>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
+        >
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowForm(true)} activeOpacity={0.7} accessibilityLabel={t('add_medication')} accessibilityRole="button">
             <MaterialCommunityIcons name="plus-circle" size={22} color="#fff" />
             <Text style={styles.addBtnText}>{t('add_medication')}</Text>
@@ -338,25 +344,17 @@ export default function PrescriptionScreen({ route }) {
           </View>
 
           {prescriptions.length === 0 ? (
-            <View style={[styles.emptyState, { flex: 1 }]}>
+            <View style={styles.emptyState}>
               <MaterialCommunityIcons name="pill" size={56} color={COLORS.outline} />
               <Text style={styles.emptyTitle}>{t('empty_medications_title')}</Text>
               <Text style={styles.emptySub}>{t('empty_medications_sub')}</Text>
             </View>
           ) : (
-            <ScrollView
-              ref={scrollRef}
-              style={{ flex: 1 }}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
-            >
-              {prescriptions.map((item, i) => (
-                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} COLORS={COLORS} styles={styles} />
-              ))}
-            </ScrollView>
+            prescriptions.map((item, i) => (
+              <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} COLORS={COLORS} styles={styles} />
+            ))
           )}
-        </View>
+        </ScrollView>
       )}
 
       {/* ── Add/Edit Form Modal ── */}
@@ -578,7 +576,7 @@ function getStyles(C) {
     avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.primary + '20' },
     avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-    scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
+    scrollContent:  { padding: 16, paddingBottom: 100 },
 
     addBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,

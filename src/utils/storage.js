@@ -131,17 +131,30 @@ export async function getIsRegistered() {
 
 // ── Prescriptions ───────────────────────────────────────────────────
 export async function getPrescriptions(targetUid) {
+  const local = (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
   if (await isFB()) {
-    const uid = targetUid || getUid();
-    if (targetUid) {
-      const data = await supabase.fbGetPatientPrescriptions(targetUid);
-      if (data && data.length > 0) return data;
-    } else {
-      const data = await supabase.fbGetPrescriptions(getUid());
-      if (data && data.length > 0) return data;
+    let remote = [];
+    try {
+      remote = targetUid
+        ? (await supabase.fbGetPatientPrescriptions(targetUid)) || []
+        : (await supabase.fbGetPrescriptions(getUid())) || [];
+    } catch (_) {}
+    if (remote.length === 0) return local;
+    const byId = new Map();
+    for (const item of remote) byId.set(item.id, item);
+    for (const item of local) {
+      const existing = byId.get(item.id);
+      if (!existing) {
+        byId.set(item.id, item);
+      } else {
+        const rTime = new Date(existing.createdAt || 0).getTime();
+        const lTime = new Date(item.createdAt || 0).getTime();
+        if (lTime > rTime) byId.set(item.id, item);
+      }
     }
+    return Array.from(byId.values());
   }
-  return (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
+  return local;
 }
 
 export async function savePrescription(prescription) {
@@ -169,16 +182,30 @@ export async function deletePrescription(id) {
 
 // ── Adherence Logs ──────────────────────────────────────────────────
 export async function getLogs(targetUid) {
+  const local = (await getItemDecrypted(KEYS.ADHERENCE)) || [];
   if (await isFB()) {
-    if (targetUid) {
-      const data = await supabase.fbGetPatientLogs(targetUid);
-      if (data && data.length > 0) return data;
-    } else {
-      const data = await supabase.fbGetLogs(getUid());
-      if (data && data.length > 0) return data;
+    let remote = [];
+    try {
+      remote = targetUid
+        ? (await supabase.fbGetPatientLogs(targetUid)) || []
+        : (await supabase.fbGetLogs(getUid())) || [];
+    } catch (_) {}
+    if (remote.length === 0) return local;
+    const byId = new Map();
+    for (const item of remote) byId.set(item.id, item);
+    for (const item of local) {
+      const existing = byId.get(item.id);
+      if (!existing) {
+        byId.set(item.id, item);
+      } else {
+        const rTime = new Date(existing.loggedAt || 0).getTime();
+        const lTime = new Date(item.loggedAt || 0).getTime();
+        if (lTime > rTime) byId.set(item.id, item);
+      }
     }
+    return Array.from(byId.values());
   }
-  return (await getItemDecrypted(KEYS.ADHERENCE)) || [];
+  return local;
 }
 
 export async function logDose(prescriptionId, status, scheduledTime) {
