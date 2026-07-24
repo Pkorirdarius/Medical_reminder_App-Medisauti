@@ -9,7 +9,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { RADIUS, SHADOW, FONT } from '../utils/constants';
-import { getUser, saveUser, clearUserData, syncConditionPrescriptions } from '../utils/storage';
+import { getUser, saveUser, clearUserData, syncConditionPrescriptions, getPrescriptions } from '../utils/storage';
 import { isConfigured as sbConfigured, updateUserPassword as sbUpdatePin } from '../utils/supabase';
 import { cancelAllReminders, requestNotificationPermission, getNotificationPermissionStatus, sendTestNotification, saveNotificationSound, getNotificationSound, SOUND_OPTIONS, speakReminder, scheduleReminder } from '../utils/reminders';
 import { useLanguage } from '../utils/LanguageContext';
@@ -100,19 +100,23 @@ export default function ProfileScreen({ onLogout }) {
         avatar: avatarUri,
       });
       if (role === 'patient' && oldCondition !== newCondition) {
-        const newSystem = await syncConditionPrescriptions(newCondition);
-        if (newSystem.length > 0) {
-          try { await cancelAllReminders(); } catch (_) {}
-          for (const rx of newSystem) {
-            for (const time of rx.times || []) {
-              try { await scheduleReminder(rx, time, language); } catch (_) {}
-            }
+        const existing = await getPrescriptions();
+        const oldSystem = existing.filter(rx => rx.source === 'system');
+        for (const rx of oldSystem) {
+          for (const nid of rx.notifIds || []) {
+            try { const { cancelReminder } = await import('../utils/reminders'); await cancelReminder(nid.nid || nid); } catch (_) {}
+          }
+        }
+        const newSystem = await syncConditionPrescriptions(newCondition, t);
+        for (const rx of newSystem) {
+          for (const time of rx.times || []) {
+            try { await scheduleReminder(rx, time, language); } catch (_) {}
           }
         }
       }
       Alert.alert(t('saved'), t('saved_profile'));
       navigation.goBack();
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { Alert.alert(t('error'), e.message); }
     finally { setSaving(false); }
   }
 
@@ -157,6 +161,10 @@ export default function ProfileScreen({ onLogout }) {
         text: t('btn_logout'), style: 'destructive',
         onPress: async () => {
           try { await cancelAllReminders(); } catch (_) {}
+          try {
+            const { clearUserData } = await import('../utils/storage');
+            await clearUserData();
+          } catch (_) {}
           if (onLogout) {
             onLogout();
           } else {

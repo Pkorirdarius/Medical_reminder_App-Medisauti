@@ -7,7 +7,7 @@
 
 CREATE TABLE users (
   id UUID PRIMARY KEY,
-  phone TEXT,
+  phone TEXT UNIQUE,
   data JSONB NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()

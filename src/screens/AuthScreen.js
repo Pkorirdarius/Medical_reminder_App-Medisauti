@@ -50,6 +50,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [newConfirmPin, setNewConfirmPin] = useState('');
   const [resetUid, setResetUid] = useState(null);
   const [resetting, setResetting] = useState(false);
+  const failedAttempts = useRef(0);
+  const lockoutUntil = useRef(0);
 
   const pulse = useRef(new Animated.Value(1)).current;
 
@@ -200,7 +202,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         }
       }
       onAuthSuccess(role);
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { Alert.alert(t('error'), e.message); }
     finally { setRegistering(false); }
   }
 
@@ -230,19 +232,37 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         await saveUser(remoteUser);
         onAuthSuccess(remoteUser.role || 'patient');
       } else {
+        if (Date.now() < lockoutUntil.current) {
+          const secs = Math.ceil((lockoutUntil.current - Date.now()) / 1000);
+          Alert.alert(t('error'), `Too many attempts. Try again in ${secs}s.`);
+          return;
+        }
         const user = await getUser();
         if (!user) {
           Alert.alert(t('error'), t('no_account_found'));
           return;
         }
         if (user.pin !== loginPin) {
-          Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
-            { text: t('forgot_pin'), onPress: startReset },
-            { text: 'OK' },
-          ]);
+          failedAttempts.current++;
+          if (failedAttempts.current >= 5) {
+            lockoutUntil.current = Date.now() + 30000;
+            failedAttempts.current = 0;
+            Alert.alert(t('error'), 'Too many failed attempts. Locked for 30 seconds.');
+          } else {
+            Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
+              { text: t('forgot_pin'), onPress: startReset },
+              { text: 'OK' },
+            ]);
+          }
           return;
         }
-        onAuthSuccess(user.role || 'patient');
+        failedAttempts.current = 0;
+        const userRole = user.role || 'patient';
+        if (loginRole !== userRole) {
+          Alert.alert(t('error'), `This account is registered as ${userRole}. Please select the correct role.`);
+          return;
+        }
+        onAuthSuccess(userRole);
       }
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
@@ -252,7 +272,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           { text: 'OK' },
         ]);
       } else {
-        Alert.alert('Error', e.message);
+        Alert.alert(t('error'), e.message);
       }
     }
   }

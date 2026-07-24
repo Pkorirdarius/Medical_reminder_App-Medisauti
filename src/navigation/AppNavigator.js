@@ -128,7 +128,21 @@ export default function AppNavigator() {
       });
       return unsub;
     }
-    setReady(true);
+    (async () => {
+      try {
+        const { getIsRegistered } = await import('../utils/storage');
+        const registered = await getIsRegistered();
+        if (registered) {
+          const { getUser } = await import('../utils/storage');
+          const u = await getUser();
+          if (u) {
+            setAuthenticated(true);
+            setUserRole(u.role || 'patient');
+          }
+        }
+      } catch (_) {}
+      setReady(true);
+    })();
   }, []);
 
   function handleAuthSuccess(role) {
@@ -138,6 +152,10 @@ export default function AppNavigator() {
 
   async function handleLogout() {
     if (sbConfigured()) await sbLogout();
+    try {
+      const { clearUserData } = await import('../utils/storage');
+      await clearUserData();
+    } catch (_) {}
     setAuthenticated(false);
     setUserRole('patient');
   }

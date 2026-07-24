@@ -1,6 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as supabase from './supabase';
 
+const _locks = {};
+function withLock(key, fn) {
+  if (!_locks[key]) _locks[key] = Promise.resolve();
+  const chain = _locks[key].then(() => fn());
+  _locks[key] = chain.catch(() => {});
+  return chain;
+}
+
 const ENC_KEY = 'medisauti-2024-enc-key!';
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
@@ -88,7 +96,7 @@ async function getItemDecrypted(key) {
   }
 }
 
-// ── Firebase helpers ───────────────────────────────────────────────
+// ── Supabase helpers ───────────────────────────────────────────────
 function getUid() {
   const u = supabase.getCurrentUser();
   return u?.id || u?.uid || null;
@@ -104,9 +112,9 @@ export async function saveUser(user) {
   const uid = getUid();
   if (supabase.isConfigured() && uid) {
     try {
-      await supabase.fbSaveUser(uid, user);
+      await supabase.sbSaveUser(uid, user);
     } catch (e) {
-      console.warn('fbSaveUser failed — saving locally only:', e.message);
+      console.warn('sbSaveUser failed — saving locally only:', e.message);
     }
   }
   const existing = (await getItemDecrypted(KEYS.USER)) || {};
@@ -117,8 +125,8 @@ export async function getUser() {
   if (supabase.isConfigured()) {
     const uid = getUid();
     if (uid) {
-      const fbUser = await supabase.fbGetUser(uid);
-      if (fbUser) return fbUser;
+      const sbUser = await supabase.sbGetUser(uid);
+      if (sbUser) return sbUser;
     }
   }
   return getItemDecrypted(KEYS.USER);
@@ -136,8 +144,8 @@ export async function getPrescriptions(targetUid) {
     let remote = [];
     try {
       remote = targetUid
-        ? (await supabase.fbGetPatientPrescriptions(targetUid)) || []
-        : (await supabase.fbGetPrescriptions(getUid())) || [];
+        ? (await supabase.sbGetPatientPrescriptions(targetUid)) || []
+        : (await supabase.sbGetPrescriptions(getUid())) || [];
     } catch (_) {}
     if (remote.length === 0) return local;
     const byId = new Map();
@@ -157,27 +165,32 @@ export async function getPrescriptions(targetUid) {
   return local;
 }
 
-export async function savePrescription(prescription) {
-  const list = await getPrescriptions();
-  const idx = list.findIndex(p => p.id === prescription.id);
-  if (idx >= 0) {
-    list[idx] = prescription;
-  } else {
-    list.push({ ...prescription, id: prescription.id || Date.now().toString() });
-  }
-  await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
-  if (await isFB()) {
-    await supabase.fbSavePrescription(getUid(), prescription);
-  }
+export async function savePrescription(prescription, targetUid) {
+  return withLock('prescriptions', async () => {
+    const list = await getPrescriptions();
+    const idx = list.findIndex(p => p.id === prescription.id);
+    if (idx >= 0) {
+      list[idx] = prescription;
+    } else {
+      list.push({ ...prescription, id: prescription.id || Date.now().toString() });
+    }
+    await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
+    if (await isFB()) {
+      const uid = targetUid || getUid();
+      try { await supabase.sbSavePrescription(uid, prescription); } catch (_) {}
+    }
+  });
 }
 
 export async function deletePrescription(id) {
-  const list = await getPrescriptions();
-  const updated = list.filter(p => p.id !== id);
-  await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
-  if (await isFB()) {
-    await supabase.fbDeletePrescription(getUid(), id);
-  }
+  return withLock('prescriptions', async () => {
+    const list = await getPrescriptions();
+    const updated = list.filter(p => p.id !== id);
+    await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
+    if (await isFB()) {
+      try { await supabase.sbDeletePrescription(getUid(), id); } catch (_) {}
+    }
+  });
 }
 
 // ── Adherence Logs ──────────────────────────────────────────────────
@@ -187,8 +200,8 @@ export async function getLogs(targetUid) {
     let remote = [];
     try {
       remote = targetUid
-        ? (await supabase.fbGetPatientLogs(targetUid)) || []
-        : (await supabase.fbGetLogs(getUid())) || [];
+        ? (await supabase.sbGetPatientLogs(targetUid)) || []
+        : (await supabase.sbGetLogs(getUid())) || [];
     } catch (_) {}
     if (remote.length === 0) return local;
     const byId = new Map();
@@ -209,19 +222,21 @@ export async function getLogs(targetUid) {
 }
 
 export async function logDose(prescriptionId, status, scheduledTime) {
-  const logs = await getLogs();
-  const logEntry = {
-    id: Date.now().toString(),
-    prescriptionId,
-    status,
-    scheduledTime,
-    loggedAt: new Date().toISOString(),
-  };
-  logs.push(logEntry);
-  await setItemEncrypted(KEYS.ADHERENCE, logs);
-  if (await isFB()) {
-    await supabase.fbLogDose(getUid(), prescriptionId, status, scheduledTime);
-  }
+  return withLock('logs', async () => {
+    const logs = await getLogs();
+    const logEntry = {
+      id: Date.now().toString(),
+      prescriptionId,
+      status,
+      scheduledTime,
+      loggedAt: new Date().toISOString(),
+    };
+    logs.push(logEntry);
+    await setItemEncrypted(KEYS.ADHERENCE, logs);
+    if (await isFB()) {
+      try { await supabase.sbLogDose(getUid(), prescriptionId, status, scheduledTime); } catch (_) {}
+    }
+  });
 }
 
 // ── Analytics (computed from local logs, always use local) ──────────
@@ -300,7 +315,8 @@ export async function getCurrentStreak(targetUid) {
   today.setHours(0, 0, 0, 0);
   let streak = 0;
   const checking = new Date(today);
-  while (true) {
+  const maxDays = 365;
+  for (let i = 0; i < maxDays; i++) {
     const dateStr = checking.toISOString().slice(0, 10);
     const dayLogs = logs.filter(l => l.loggedAt.startsWith(dateStr));
     const taken = dayLogs.filter(l => l.status === 'taken').length;
@@ -373,7 +389,7 @@ export async function getAdherenceTrend(days = 30, targetUid) {
 // ── Doctor Management ───────────────────────────────────────────────
 export async function getDoctors() {
   if (supabase.isConfigured()) {
-    const data = await supabase.fbGetDoctors();
+    const data = await supabase.sbGetDoctors();
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.DOCTORS)) || [];
@@ -389,13 +405,13 @@ export async function saveDoctorProfile(doctor) {
   }
   await setItemEncrypted(KEYS.DOCTORS, list);
   if (supabase.isConfigured()) {
-    await supabase.fbSaveDoctor(doctor);
+    await supabase.sbSaveDoctor(doctor);
   }
 }
 
 export async function getMyDoctor() {
   if (await isFB()) {
-    const data = await supabase.fbGetMyDoctor(getUid());
+    const data = await supabase.sbGetMyDoctor(getUid());
     if (data) return data;
   }
   return getItemDecrypted(KEYS.MY_DOCTOR);
@@ -413,7 +429,7 @@ export async function setMyDoctor(doctor) {
       } catch (_) {}
     }
     const patientData = await getUser();
-    await supabase.fbSetMyDoctor(getUid(), doctor, doctorUid, patientData);
+    await supabase.sbSetMyDoctor(getUid(), doctor, doctorUid, patientData);
   } else if (!doctor) {
     await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
   }
@@ -433,7 +449,7 @@ export async function getDoctorPatients() {
     }
     if (!doctorUid) return [];
     try {
-      return await supabase.fbGetDoctorPatients(doctorUid);
+      return await supabase.sbGetDoctorPatients(doctorUid);
     } catch (_) {}
   }
   return [];
@@ -442,19 +458,20 @@ export async function getDoctorPatients() {
 // ── Condition Presets ───────────────────────────────────────────────
 const CONDITION_PRESETS = {
   diabetes: [
-    { drugName: 'Metformin', dosage: '500mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara mbili kwa siku', times: ['08:00', '20:00'], notes: 'Pamoja na chakula', source: 'system', voiceNotif: true },
-    { drugName: 'Insulin Glargine (Lantus)', dosage: '10 units', dosageQuantity: '1', dosageForm: 'injection', frequency: 'Mara moja kwa siku', times: ['21:00'], notes: 'Kabla ya kulala — sindano chini ya ngozi', source: 'system', voiceNotif: true },
+    { drugName: 'Metformin', dosage: '500mg', dosageQuantity: '1', dosageForm: 'tablet', frequencyKey: 'freq_twice', times: ['08:00', '20:00'], notesKey: 'system_notes_with_food', source: 'system', voiceNotif: true },
+    { drugName: 'Insulin Glargine (Lantus)', dosage: '10 units', dosageQuantity: '1', dosageForm: 'injection', frequencyKey: 'freq_once', times: ['21:00'], notesKey: 'system_notes_before_sleep_injection', source: 'system', voiceNotif: true },
   ],
   bp: [
-    { drugName: 'Amlodipine', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi baada ya kiamsha kinywa', source: 'system', voiceNotif: true },
-    { drugName: 'Enalapril', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['08:00'], notes: 'Asubuhi pamoja na Amlodipine', source: 'system', voiceNotif: true },
+    { drugName: 'Amlodipine', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequencyKey: 'freq_once', times: ['08:00'], notesKey: 'system_notes_morning_breakfast', source: 'system', voiceNotif: true },
+    { drugName: 'Enalapril', dosage: '5mg', dosageQuantity: '1', dosageForm: 'tablet', frequencyKey: 'freq_once', times: ['08:00'], notesKey: 'system_notes_morning_with_amlodipine', source: 'system', voiceNotif: true },
   ],
   hiv: [
-    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', dosageQuantity: '1', dosageForm: 'tablet', frequency: 'Mara moja kwa siku', times: ['20:00'], notes: 'Usiku kabla ya kulala — usikose dozi', source: 'system', voiceNotif: true },
+    { drugName: 'TLD (Tenofovir/Lamivudine/Dolutegravir)', dosage: '300/300/50mg', dosageQuantity: '1', dosageForm: 'tablet', frequencyKey: 'freq_once', times: ['20:00'], notesKey: 'system_notes_night_no_miss', source: 'system', voiceNotif: true },
   ],
 };
 
-function generateSystemPrescriptions(condition) {
+function generateSystemPrescriptions(condition, t) {
+  const tr = typeof t === 'function' ? t : (k) => k;
   const c = condition.toLowerCase();
   const parts = c.split(',').map(s => s.trim()).filter(Boolean);
   let allPresets = [];
@@ -472,35 +489,47 @@ function generateSystemPrescriptions(condition) {
   }
   return deduped.map(preset => ({
     id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
-    ...preset,
+    drugName: preset.drugName,
+    dosage: preset.dosage,
+    dosageQuantity: preset.dosageQuantity,
+    dosageForm: preset.dosageForm,
+    frequency: tr(preset.frequencyKey),
+    times: preset.times,
+    notes: preset.notesKey ? tr(preset.notesKey) : '',
+    source: preset.source,
+    voiceNotif: preset.voiceNotif,
     createdAt: new Date().toISOString(),
     active: true,
     notifIds: [],
   }));
 }
 
-export async function addConditionPrescriptions(condition) {
-  const created = generateSystemPrescriptions(condition);
+export async function addConditionPrescriptions(condition, t) {
+  const created = generateSystemPrescriptions(condition, t);
   if (created.length === 0) return [];
-  for (const rx of created) {
-    if (await isFB()) await supabase.fbSavePrescription(getUid(), rx);
+  const existing = (await getItemDecrypted(KEYS.PRESCRIPTIONS)) || [];
+  const merged = [...existing, ...created];
+  await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
+  if (await isFB()) {
+    for (const rx of created) {
+      try { await supabase.sbSavePrescription(getUid(), rx); } catch (_) {}
+    }
   }
-  await setItemEncrypted(KEYS.PRESCRIPTIONS, created);
   return created;
 }
 
-export async function syncConditionPrescriptions(condition) {
+export async function syncConditionPrescriptions(condition, t) {
   const existing = await getPrescriptions();
   const oldSystem = existing.filter(rx => rx.source === 'system');
   const manual = existing.filter(rx => rx.source !== 'system');
-  const newSystem = generateSystemPrescriptions(condition);
+  const newSystem = generateSystemPrescriptions(condition, t);
   const merged = [...manual, ...newSystem];
   await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
   if (await isFB()) {
     for (const rx of oldSystem) {
-      try { await supabase.fbDeletePrescription(getUid(), rx.id); } catch (_) {}
+      try { await supabase.sbDeletePrescription(getUid(), rx.id); } catch (_) {}
     }
-    for (const rx of newSystem) await supabase.fbSavePrescription(getUid(), rx);
+    for (const rx of newSystem) await supabase.sbSavePrescription(getUid(), rx);
   }
   return newSystem;
 }
@@ -511,19 +540,19 @@ export async function saveSchedule(schedule) {
   schedules.push({ ...schedule, id: schedule.id || Date.now().toString() });
   await setItemEncrypted(KEYS.SCHEDULES, schedules);
   if (await isFB()) {
-    await supabase.fbSaveSchedule(getUid(), schedule);
+    await supabase.sbSaveSchedule(getUid(), schedule);
   }
 }
 
 export async function getSchedules() {
   if (await isFB()) {
-    const data = await supabase.fbGetSchedules(getUid());
+    const data = await supabase.sbGetSchedules(getUid());
     if (data && data.length > 0) return data;
   }
   return (await getItemDecrypted(KEYS.SCHEDULES)) || [];
 }
 
-// ── Clear All (local only — keeps Firebase data intact) ────────────
+// ── Clear All (local only — keeps Supabase data intact) ────────────
 export async function clearAllData() {
   const keys = Object.values(KEYS);
   await AsyncStorage.multiRemove(keys);
@@ -565,7 +594,7 @@ export async function enforceExpiredPrescriptions() {
     await setItemEncrypted(KEYS.PRESCRIPTIONS, prescriptions);
     if (await isFB()) {
       for (const rx of prescriptions) {
-        if (rx.active === false) await supabase.fbSavePrescription(getUid(), rx);
+        if (rx.active === false) await supabase.sbSavePrescription(getUid(), rx);
       }
     }
   }
@@ -579,7 +608,7 @@ export async function updateMedicationStock(prescriptionId, stock) {
   if (rx) {
     rx.stock = stock;
     await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
-    if (await isFB()) await supabase.fbSavePrescription(getUid(), rx);
+    if (await isFB()) await supabase.sbSavePrescription(getUid(), rx);
   }
 }
 
@@ -594,10 +623,23 @@ export async function exportDataAsJSON() {
 export async function exportDataAsCSV() {
   const logs = await getLogs();
   const prescriptions = await getPrescriptions();
+  function esc(val) {
+    const s = String(val == null ? '' : val);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? '"' + s.replace(/"/g, '""') + '"'
+      : s;
+  }
   const header = 'Date,Drug Name,Dosage,Status,Scheduled Time,Logged At\n';
   const rows = logs.map(l => {
     const rx = prescriptions.find(p => p.id === l.prescriptionId);
-    return `${l.loggedAt?.slice(0, 10) || ''},${rx?.drugName || 'Unknown'},${rx?.dosage || ''},${l.status},${l.scheduledTime || ''},${l.loggedAt || ''}`;
+    return [
+      esc(l.loggedAt?.slice(0, 10) || ''),
+      esc(rx?.drugName || 'Unknown'),
+      esc(rx?.dosage || ''),
+      esc(l.status),
+      esc(l.scheduledTime || ''),
+      esc(l.loggedAt || ''),
+    ].join(',');
   }).join('\n');
   return header + rows;
 }

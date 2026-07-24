@@ -112,7 +112,7 @@ export async function getNotificationSound() {
  * '8' → '08:00', '8:5' → '08:05', '08:00' → '08:00'
  */
 export function normalizeTime(t) {
-  if (!t || !t.includes(':')) {
+  if (!t || typeof t !== 'string' || !t.includes(':')) {
     const h = String(parseInt(t, 10) || 0).padStart(2, '0');
     return `${h}:00`;
   }
@@ -130,9 +130,6 @@ function secondsUntil(hour, minute) {
 }
 
 function buildTrigger(hour, minute) {
-  if (Platform.OS === 'android') {
-    return { type: 'timeInterval', seconds: secondsUntil(hour, minute) };
-  }
   return { type: 'daily', hour, minute };
 }
 

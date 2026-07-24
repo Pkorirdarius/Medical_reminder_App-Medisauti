@@ -39,6 +39,7 @@ export default function ReportScreen() {
   const [perMed, setPerMed] = useState([]);
   const [patterns, setPatterns] = useState({ morning: 0, afternoon: 0, evening: 0, night: 0 });
   const [trend, setTrend] = useState({ direction: 'insufficient', weeklyRates: [] });
+  const [reportHistory, setReportHistory] = useState([]);
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
   useFocusEffect(useCallback(() => {
@@ -58,6 +59,28 @@ export default function ReportScreen() {
       setPerMed(pm);
       setPatterns(ptn);
       setTrend(tr);
+
+      const now = new Date();
+      const history = [];
+      if (adh.rate > 0) {
+        history.push({
+          title: t('report_last_30days'),
+          date: `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`,
+          rate: `${adh.rate}%`,
+        });
+      }
+      const weekly = tr.weeklyRates || [];
+      for (let i = 0; i < Math.min(weekly.length, 3); i++) {
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - (i * 7));
+        const label = i === 0 ? t('report_this_week') : `${t('report_week')} -${i}`;
+        history.push({
+          title: label,
+          date: `${weekAgo.getDate()}/${weekAgo.getMonth() + 1}/${weekAgo.getFullYear()}`,
+          rate: `${weekly[i]}%`,
+        });
+      }
+      setReportHistory(history);
     } catch (e) { console.error(e); }
     finally { setLoading(false); setRefreshing(false); }
   }
@@ -77,17 +100,22 @@ export default function ReportScreen() {
       } else {
         Alert.alert('PDF Generated', `File saved at: ${uri}`);
       }
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { Alert.alert(t('error'), e.message); }
     finally { setExporting(false); }
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   function buildReportHtml() {
     let medRows = '';
     for (const p of prescriptions) {
       const dosageDetail = p.dosageQuantity
-        ? `${p.dosageQuantity} ${t('form_' + (p.dosageForm || 'tablet'))} · ${p.dosage}`
-        : p.dosage;
-      medRows += `<tr><td>${p.drugName} ${p.dosage}</td><td>${dosageDetail}</td><td>${p.frequency}</td><td>${(p.times || []).join(', ')}</td></tr>`;
+        ? `${escapeHtml(p.dosageQuantity)} ${t('form_' + (p.dosageForm || 'tablet'))} · ${escapeHtml(p.dosage)}`
+        : escapeHtml(p.dosage);
+      medRows += `<tr><td>${escapeHtml(p.drugName)} ${escapeHtml(p.dosage)}</td><td>${dosageDetail}</td><td>${escapeHtml(p.frequency)}</td><td>${escapeHtml((p.times || []).join(', '))}</td></tr>`;
     }
     let streakRows = '';
     for (const d of streak) {
@@ -98,7 +126,7 @@ export default function ReportScreen() {
 <html><head><meta charset="utf-8"><title>MediSauti Report</title>
 <style>body{font-family:sans-serif;padding:24px;color:#1a1c1a}h1{color:#00513f;font-size:24px}h2{color:#27609d;font-size:18px;margin-top:24px}.rate{font-size:48px;font-weight:800;color:${rateColor}}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;border:1px solid #ddd;text-align:left}th{background:#f3f4f0}.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}.badge-green{background:#E8F5E9;color:#2E7D32}.badge-amber{background:#FFF8E1;color:#F57F17}.badge-red{background:#FFEBEE;color:#C62828}.section{margin-bottom:24px}.med-detail{color:#6f7a74;font-size:13px}</style></head><body>
 <h1>MediSauti — ${t('header_report')}</h1>
-<p><strong>${t('preview_patient')}:</strong> ${user.name || '—'} | <strong>${t('preview_period')}:</strong> ${t('preview_last_30days')}</p>
+<p><strong>${t('preview_patient')}:</strong> ${escapeHtml(user.name) || '—'} | <strong>${t('preview_period')}:</strong> ${t('preview_last_30days')}</p>
 <h2>${t('preview_adherence')}: <span class="rate">${rate}%</span></h2>
 <p>${t('preview_taken')}: ${adherence.taken} | ${t('preview_missed')}: ${adherence.missed}</p>
 <h2>${t('preview_trend')}: ${trend.direction}</h2>
@@ -137,7 +165,7 @@ export default function ReportScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export MediSauti Data' });
       }
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { Alert.alert(t('error'), e.message); }
   }
 
   async function exportCSV() {
@@ -147,7 +175,7 @@ export default function ReportScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Export MediSauti Data' });
       }
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) { Alert.alert(t('error'), e.message); }
   }
 
   const maxPattern = Math.max(1, ...Object.values(patterns));
@@ -367,11 +395,10 @@ export default function ReportScreen() {
               <MaterialCommunityIcons name="history" size={18} color={COLORS.outline} />
               <Text style={[styles.sectionLabel, { marginLeft: 8 }]}>{t('heading_report_history')}</Text>
             </View>
-            {[
-              { title: 'June 2024', date: 'Jun 30, 2024', rate: '82%' },
-              { title: 'Weekly Summary', date: 'Jun 23, 2024', rate: '78%' },
-              { title: 'Q1 2024 Review', date: 'Mar 31, 2024', rate: '85%' },
-            ].map((rpt, i) => (
+            {reportHistory.length === 0 && (
+              <Text style={[styles.historyDate, { padding: 12 }]}>{t('report_no_data')}</Text>
+            )}
+            {reportHistory.map((rpt, i) => (
               <TouchableOpacity key={i} style={styles.historyRow} activeOpacity={0.7}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.historyTitle}>{rpt.title}</Text>

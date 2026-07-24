@@ -53,7 +53,7 @@ export default function RemindersScreen() {
   const { language, toggleLanguage, t } = useLanguage();
   const scrollRef = useRef(null);
 
-  const [user, setUser] = useState({ name: 'User' });
+  const [user, setUser] = useState({ name: '' });
   const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,12 +152,23 @@ export default function RemindersScreen() {
   function onRefresh() { setRefreshing(true); loadData(); }
 
   async function handleAction(key, action, item) {
+    const previousStatus = doseStatus[key];
     setDoseStatus(s => ({ ...s, [key]: action }));
     const scheduledTime = new Date();
     const [h, m] = item.time.split(':').map(Number);
     scheduledTime.setHours(h, m, 0, 0);
 
-    await logDose(item.prescriptionId, action, scheduledTime.toISOString());
+    try {
+      await logDose(item.prescriptionId, action, scheduledTime.toISOString());
+    } catch (e) {
+      setDoseStatus(s => {
+        const next = { ...s };
+        delete next[key];
+        return next;
+      });
+      Alert.alert(t('error'), 'Failed to log dose. Please try again.');
+      return;
+    }
 
     if (action === 'taken') {
       const label = getTimeLabel(item.time, language);
@@ -166,13 +177,18 @@ export default function RemindersScreen() {
         dosage: item.dosage || '',
         dosageQuantity: item.dosageQuantity,
         dosageForm: item.dosageForm,
-      }, label, 'sw');
+      }, label, language);
     } else if (action === 'snoozed') {
       try {
         await snoozeReminder(item, language);
         Alert.alert(t('snooze_alert_title'), t('snooze_alert_body'));
       } catch (e) {
-        console.warn('Snooze failed', e);
+        setDoseStatus(s => {
+          const next = { ...s };
+          delete next[key];
+          return next;
+        });
+        Alert.alert(t('error'), 'Snooze failed. Please try again.');
       }
     }
   }

@@ -23,7 +23,7 @@ export default function ScanScreen() {
   const navigation = useNavigation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const cameraRef = useRef(null);
-  const [user, setUser]           = useState({ name: 'User' });
+  const [user, setUser]           = useState({ name: '' });
   const [hasPermission, setHasPermission] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [recentScans, setRecentScans] = useState([]);
@@ -101,7 +101,7 @@ export default function ScanScreen() {
       {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.getParent()?.openDrawer?.()}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
             <MaterialCommunityIcons name="menu" size={24} color={COLORS.primary} />
           </TouchableOpacity>
           <Text style={styles.logoText}>MediSauti</Text>

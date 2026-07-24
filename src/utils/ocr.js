@@ -150,7 +150,7 @@ export function parseOCRText(rawText) {
     dosageForm = 'inhaler';
   } else if (/cream|krimu/i.test(rawText)) {
     dosageForm = 'cream';
-  } else if (/ointment|ointment/i.test(rawText)) {
+  } else if (/ointment|salve/i.test(rawText)) {
     dosageForm = 'ointment';
   } else if (/suppository/i.test(rawText)) {
     dosageForm = 'suppository';

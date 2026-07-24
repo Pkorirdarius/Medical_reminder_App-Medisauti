@@ -231,6 +231,11 @@ const LANG = {
   doctor_notes:            { sw: 'Maelezo ya daktari', en: 'Doctor notes' },
   rx_issued:               { sw: 'Dawa imetolewa kwa mgonjwa.', en: 'Prescription issued to patient.' },
   no_condition_match:      { sw: 'Hali ya kiafya haijatambuliwa kwa dawa za kiotomatiki.', en: 'Condition not recognized for auto-prescriptions.' },
+  system_notes_with_food:         { sw: 'Pamoja na chakula', en: 'Take with food' },
+  system_notes_before_sleep_injection: { sw: 'Kabla ya kulala — sindano chini ya ngozi', en: 'Before bed — inject under skin' },
+  system_notes_morning_breakfast: { sw: 'Asubuhi baada ya kiamsha kinywa', en: 'Morning after breakfast' },
+  system_notes_morning_with_amlodipine: { sw: 'Asubuhi pamoja na Amlodipine', en: 'Morning with Amlodipine' },
+  system_notes_night_no_miss:     { sw: 'Usiku kabla ya kulala — usikose dozi', en: 'At night before bed — do not miss dose' },
 
   // ── Voice Notifications ──────────────────────────────────────
   voice_label:             { sw: 'Sauti', en: 'Voice' },
@@ -268,6 +273,10 @@ const LANG = {
   heading_missed_patterns: { sw: 'Mifumo ya dawa zinazokosa', en: 'Missed Dose Patterns' },
   heading_streak_7day:     { sw: 'Msururu wa siku 7', en: '7-Day Streak' },
   heading_report_history:  { sw: 'Historia ya ripoti', en: 'Report History' },
+  report_week:             { sw: 'Wiki', en: 'Week' },
+  report_this_week:        { sw: 'Wiki hii', en: 'This week' },
+  report_last_30days:      { sw: 'Siku 30 zilizopita', en: 'Last 30 days' },
+  report_no_data:          { sw: 'Hakuna data bado', en: 'No data yet' },
   heading_share_doctor:    { sw: 'Ungana na daktari', en: 'Share with your doctor' },
   heading_need_help:       { sw: 'Unahitaji msaada?', en: 'Need help?' },
   share_doctor_desc:       { sw: 'Pakua ripoti ya PDF na umwonyeshe daktari wako ili aweze kuelewa hali yako kwa undani.', en: 'Download the PDF report and show it to your doctor so they can understand your condition in detail.' },

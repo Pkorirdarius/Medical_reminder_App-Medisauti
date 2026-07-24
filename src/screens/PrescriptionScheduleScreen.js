@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, Platform,
+  TextInput, Alert, ActivityIndicator, Platform, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -11,7 +11,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { RADIUS, FONT } from '../utils/constants';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
-import { getUser, savePrescription, saveSchedule, getPrescriptions } from '../utils/storage';
+import { getUser, savePrescription, saveSchedule, getPrescriptions, getDoctorPatients } from '../utils/storage';
 import { requestNotificationPermission } from '../utils/reminders';
 
 export default function PrescriptionScheduleScreen() {
@@ -22,6 +22,9 @@ export default function PrescriptionScheduleScreen() {
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   const [patient, setPatient] = useState(null);
+  const [patients, setPatients] = useState([]);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  const [showPatientPicker, setShowPatientPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -30,7 +33,7 @@ export default function PrescriptionScheduleScreen() {
   const [dosage, setDosage] = useState('');
   const [dosageQuantity, setDosageQuantity] = useState('');
   const [dosageForm, setDosageForm] = useState('tablet');
-  const [frequency, setFrequency] = useState('Mara moja kwa siku');
+  const [frequency, setFrequency] = useState(t('freq_once'));
   const [times, setTimes] = useState(['08:00']);
   const [durationValue, setDurationValue] = useState('7');
   const [durationUnit, setDurationUnit] = useState('days');
@@ -59,6 +62,11 @@ export default function PrescriptionScheduleScreen() {
     try {
       const u = await getUser();
       setPatient(u);
+      if (u && u.role === 'doctor') {
+        const pts = await getDoctorPatients();
+        setPatients(pts);
+        if (pts.length > 0) setSelectedPatient(pts[0]);
+      }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }
@@ -68,7 +76,7 @@ export default function PrescriptionScheduleScreen() {
     setDosage('');
     setDosageQuantity('');
     setDosageForm('tablet');
-    setFrequency('Mara moja kwa siku');
+    setFrequency(t('freq_once'));
     setTimes(['08:00']);
     setDurationValue('7');
     setDurationUnit('days');
@@ -80,6 +88,10 @@ export default function PrescriptionScheduleScreen() {
   async function handleIssue() {
     if (!drugName.trim() || !dosage.trim()) {
       Alert.alert(t('error'), t('validation_error'));
+      return;
+    }
+    if (!selectedPatient) {
+      Alert.alert(t('error'), 'Please select a patient first.');
       return;
     }
     const notifGranted = await requestNotificationPermission();
@@ -109,14 +121,16 @@ export default function PrescriptionScheduleScreen() {
         durationUnit,
         startDate: startDate.toISOString().slice(0, 10),
         issuedBy: patient?.name || 'Doctor',
+        patientUid: selectedPatient.uid,
         scheduled: true,
       };
 
-      await savePrescription(prescription);
+      await savePrescription(prescription, selectedPatient.uid);
 
       const schedule = {
         id: prescription.id,
-        patientName: patient?.name || 'Patient',
+        patientName: selectedPatient?.name || 'Patient',
+        patientUid: selectedPatient.uid,
         drugName: prescription.drugName,
         dosage: prescription.dosage,
         dosageQuantity: prescription.dosageQuantity,
@@ -226,16 +240,32 @@ export default function PrescriptionScheduleScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Patient Info */}
-          <View style={styles.patientCard}>
-            <View style={styles.patientAvatar}>
-              <Text style={styles.patientAvatarText}>{(patient?.name || 'D').slice(0, 2).toUpperCase()}</Text>
+          {/* Patient Selector */}
+          {patients.length > 0 ? (
+            <>
+              <Text style={styles.fieldLabel}>Select Patient</Text>
+              <TouchableOpacity style={styles.patientCard} onPress={() => setShowPatientPicker(true)} activeOpacity={0.7}>
+                <View style={styles.patientAvatar}>
+                  <Text style={styles.patientAvatarText}>{(selectedPatient?.name || 'P').slice(0, 2).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.patientName}>{selectedPatient?.name || 'Select patient'}</Text>
+                  <Text style={styles.patientMeta}>{selectedPatient?.condition || ''}</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-down" size={24} color={COLORS.outline} />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.patientCard}>
+              <View style={styles.patientAvatar}>
+                <Text style={styles.patientAvatarText}>{(patient?.name || 'D').slice(0, 2).toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.patientName}>{patient?.name}</Text>
+                <Text style={styles.patientMeta}>{t('role_doctor')} — {patient?.specialization || ''}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.patientName}>{patient?.name}</Text>
-              <Text style={styles.patientMeta}>{t('role_doctor')} — {patient?.specialization || ''}</Text>
-            </View>
-          </View>
+          )}
 
           <Text style={styles.formTitle}>{t('schedule_title')}</Text>
           <Text style={styles.formSub}>{t('schedule_sub')}</Text>
@@ -416,6 +446,41 @@ export default function PrescriptionScheduleScreen() {
           <View style={{ height: 60 }} />
         </ScrollView>
       </View>
+
+      {/* Patient Picker Modal */}
+      <Modal visible={showPatientPicker} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: COLORS.surfaceLowest, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '60%', paddingTop: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 }}>
+              <Text style={{ fontSize: 16, fontFamily: FONT.bold, color: COLORS.onSurface }}>Select Patient</Text>
+              <TouchableOpacity onPress={() => setShowPatientPicker(false)}>
+                <MaterialCommunityIcons name="close" size={24} color={COLORS.outline} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 16 }}>
+              {patients.map((p) => (
+                <TouchableOpacity
+                  key={p.uid}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: COLORS.surfaceHigh }}
+                  onPress={() => { setSelectedPatient(p); setShowPatientPicker(false); }}
+                >
+                  <View style={[styles.patientAvatar, { backgroundColor: COLORS.primaryContainer }]}>
+                    <Text style={styles.patientAvatarText}>{(p.name || 'P').slice(0, 2).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontFamily: FONT.bodySemiBold, color: COLORS.onSurface }}>{p.name}</Text>
+                    <Text style={{ fontSize: 12, fontFamily: FONT.body, color: COLORS.outline }}>{p.condition || ''}</Text>
+                  </View>
+                  {selectedPatient?.uid === p.uid && (
+                    <MaterialCommunityIcons name="check-circle" size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <View style={{ height: 20 }} />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

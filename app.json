@@ -25,8 +25,7 @@
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
         "VIBRATE",
-        "POST_NOTIFICATIONS",
-        "DETECT_SCREEN_CAPTURE"
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [

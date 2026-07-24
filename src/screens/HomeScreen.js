@@ -28,7 +28,7 @@ export default function HomeScreen() {
   const scrollRef = useRef(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const [user, setUser]           = useState({ name: 'Darius' });
+  const [user, setUser] = useState({ name: '' });
   const [prescriptions, setP]    = useState([]);
   const [adherence, setAdh]      = useState({ rate: 0, taken: 0, missed: 0 });
   const [nextReminder, setNext]  = useState(null);
@@ -310,13 +310,15 @@ export default function HomeScreen() {
                   <Text style={[styles.sectionLabel, { marginLeft: 6 }]}>{t('this_week')}</Text>
                 </View>
                 <View style={styles.weekRow}>
-                  {[t('mon'),t('tue'),t('wed'),t('thu'),t('fri'),t('sat'),t('sun')].map((d, i) => {
-                    const dayOk = i < new Date().getDay();
+                  {[t('sun'),t('mon'),t('tue'),t('wed'),t('thu'),t('fri'),t('sat')].map((d, i) => {
+                    const todayDow = new Date().getDay();
+                    const dayOk = i < todayDow;
+                    const dayToday = i === todayDow;
                     return (
                       <View key={d} style={styles.weekCol}>
                         <View style={[
                           styles.weekDot,
-                          { backgroundColor: dayOk ? COLORS.green[400] : i === new Date().getDay() - 1 ? COLORS.amber[400] : COLORS.surfaceHigh }
+                          { backgroundColor: dayOk ? COLORS.green[400] : dayToday ? COLORS.amber[400] : COLORS.surfaceHigh }
                         ]} />
                         <Text style={styles.weekLabel}>{d.slice(0, 1)}</Text>
                       </View>

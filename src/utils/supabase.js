@@ -1,6 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+function generateId() {
+  const t = Date.now().toString(36);
+  const r = Math.random().toString(36).slice(2, 10);
+  return `${t}-${r}`;
+}
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -105,14 +111,14 @@ async function updateUserPassword(currentPin, newPin) {
   if (error) throw error;
 }
 
-async function fbGetUser(uid) {
+async function sbGetUser(uid) {
   if (!supabase) return null;
   const { data, error } = await supabase.from('users').select('*').eq('id', uid).maybeSingle();
   if (error || !data) return null;
   return { uid, ...data.data, phone: data.phone };
 }
 
-async function fbSaveUser(uid, userData) {
+async function sbSaveUser(uid, userData) {
   if (!supabase) return;
   await supabase.from('users').upsert({
     id: uid,
@@ -121,15 +127,15 @@ async function fbSaveUser(uid, userData) {
   });
 }
 
-async function fbGetPrescriptions(uid) {
+async function sbGetPrescriptions(uid) {
   if (!supabase) return [];
   const { data } = await supabase.from('prescriptions').select('*').eq('user_id', uid);
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbSavePrescription(uid, prescription) {
+async function sbSavePrescription(uid, prescription) {
   if (!supabase) return;
-  const id = prescription.id || Date.now().toString();
+  const id = prescription.id || generateId();
   await supabase.from('prescriptions').upsert({
     id,
     user_id: uid,
@@ -138,17 +144,17 @@ async function fbSavePrescription(uid, prescription) {
   return id;
 }
 
-async function fbDeletePrescription(uid, id) {
+async function sbDeletePrescription(uid, id) {
   if (!supabase) return;
   await supabase.from('prescriptions').delete().eq('id', id).eq('user_id', uid);
 }
 
-async function fbDeleteAllPrescriptions(uid) {
+async function sbDeleteAllPrescriptions(uid) {
   if (!supabase) return;
   await supabase.from('prescriptions').delete().eq('user_id', uid);
 }
 
-async function fbGetLogs(uid) {
+async function sbGetLogs(uid) {
   if (!supabase) return [];
   const { data } = await supabase
     .from('adherence_logs')
@@ -159,9 +165,9 @@ async function fbGetLogs(uid) {
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbLogDose(uid, prescriptionId, status, scheduledTime) {
+async function sbLogDose(uid, prescriptionId, status, scheduledTime) {
   if (!supabase) return;
-  const id = Date.now().toString();
+  const id = generateId();
   const loggedAt = new Date().toISOString();
   await supabase.from('adherence_logs').insert({
     id,
@@ -177,18 +183,18 @@ async function fbLogDose(uid, prescriptionId, status, scheduledTime) {
   });
 }
 
-async function fbDeleteAllLogs(uid) {
+async function sbDeleteAllLogs(uid) {
   if (!supabase) return;
   await supabase.from('adherence_logs').delete().eq('user_id', uid);
 }
 
-async function fbGetDoctors() {
+async function sbGetDoctors() {
   if (!supabase) return [];
   const { data } = await supabase.from('doctors').select('*');
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbSaveDoctor(doctor) {
+async function sbSaveDoctor(doctor) {
   if (!supabase) return;
   const { data: existing } = await supabase.from('doctors').select('*').eq('phone', doctor.phone).maybeSingle();
   if (existing) {
@@ -203,15 +209,15 @@ async function fbSaveDoctor(doctor) {
   }
 }
 
-async function fbGetSchedules(uid) {
+async function sbGetSchedules(uid) {
   if (!supabase) return [];
   const { data } = await supabase.from('schedules').select('*').eq('user_id', uid);
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbSaveSchedule(uid, schedule) {
+async function sbSaveSchedule(uid, schedule) {
   if (!supabase) return;
-  const id = Date.now().toString();
+  const id = generateId();
   await supabase.from('schedules').insert({
     id,
     user_id: uid,
@@ -219,18 +225,18 @@ async function fbSaveSchedule(uid, schedule) {
   });
 }
 
-async function fbDeleteAllSchedules(uid) {
+async function sbDeleteAllSchedules(uid) {
   if (!supabase) return;
   await supabase.from('schedules').delete().eq('user_id', uid);
 }
 
-async function fbGetMyDoctor(uid) {
+async function sbGetMyDoctor(uid) {
   if (!supabase) return null;
   const { data } = await supabase.from('my_doctor').select('*').eq('id', uid).maybeSingle();
   return data?.data || null;
 }
 
-async function fbGetDoctorPatients(doctorUid) {
+async function sbGetDoctorPatients(doctorUid) {
   if (!supabase) return [];
   const { data } = await supabase.from('my_doctor').select('*').eq('doctor_uid', doctorUid);
   if (!data || data.length === 0) return [];
@@ -240,20 +246,20 @@ async function fbGetDoctorPatients(doctorUid) {
   }).filter(p => p.name);
 }
 
-async function fbGetUserByPhone(phone) {
+async function sbGetUserByPhone(phone) {
   if (!supabase) return null;
   const { data } = await supabase.from('users').select('*').eq('phone', phone).maybeSingle();
   if (!data) return null;
   return { uid: data.id, ...data.data, phone: data.phone };
 }
 
-async function fbGetPatientPrescriptions(patientUid) {
+async function sbGetPatientPrescriptions(patientUid) {
   if (!supabase) return [];
   const { data } = await supabase.from('prescriptions').select('*').eq('user_id', patientUid);
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbGetPatientLogs(patientUid) {
+async function sbGetPatientLogs(patientUid) {
   if (!supabase) return [];
   const { data } = await supabase
     .from('adherence_logs')
@@ -264,7 +270,7 @@ async function fbGetPatientLogs(patientUid) {
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbSetMyDoctor(uid, doctor, doctorUid, patientData) {
+async function sbSetMyDoctor(uid, doctor, doctorUid, patientData) {
   if (!supabase) return;
   if (doctor) {
     await supabase.from('my_doctor').upsert({
@@ -278,32 +284,32 @@ async function fbSetMyDoctor(uid, doctor, doctorUid, patientData) {
   }
 }
 
-async function fbGetConditionPresets() {
+async function sbGetConditionPresets() {
   if (!supabase) return [];
   const { data } = await supabase.from('condition_presets').select('*');
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbDeleteAllUserData(uid) {
+async function sbDeleteAllUserData(uid) {
   if (!supabase) return;
   await Promise.all([
-    fbDeleteAllPrescriptions(uid),
-    fbDeleteAllLogs(uid),
-    fbDeleteAllSchedules(uid),
+    sbDeleteAllPrescriptions(uid),
+    sbDeleteAllLogs(uid),
+    sbDeleteAllSchedules(uid),
   ]);
 }
 
 export {
   isConfigured, init,
   getAuthInstance, getCurrentUser, getClient, registerUser, loginUser, logoutUser, onAuthChanged, updateUserPassword,
-  fbGetUser, fbSaveUser,
-  fbGetPrescriptions, fbSavePrescription, fbDeletePrescription,
-  fbGetLogs, fbLogDose,
-  fbGetDoctors, fbSaveDoctor,
-  fbGetSchedules, fbSaveSchedule,
-  fbGetMyDoctor, fbSetMyDoctor,
-  fbGetDoctorPatients, fbGetUserByPhone,
-  fbGetPatientPrescriptions, fbGetPatientLogs,
-  fbGetConditionPresets,
-  fbDeleteAllUserData,
+  sbGetUser, sbSaveUser,
+  sbGetPrescriptions, sbSavePrescription, sbDeletePrescription,
+  sbGetLogs, sbLogDose,
+  sbGetDoctors, sbSaveDoctor,
+  sbGetSchedules, sbSaveSchedule,
+  sbGetMyDoctor, sbSetMyDoctor,
+  sbGetDoctorPatients, sbGetUserByPhone,
+  sbGetPatientPrescriptions, sbGetPatientLogs,
+  sbGetConditionPresets,
+  sbDeleteAllUserData,
 };

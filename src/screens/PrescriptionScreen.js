@@ -88,19 +88,20 @@ export default function PrescriptionScreen({ route }) {
   const styles = useMemo(() => getStyles(COLORS), [COLORS]);
   const scrollRef = useRef(null);
 
-  const [user, setUser] = useState({ name: 'User' });
+  const [user, setUser] = useState({ name: '' });
   const [prescriptions, setPrescriptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState({ ...INITIAL_FORM, frequency: t('freq_once') });
   const [saving, setSaving] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrMode, setOcrMode] = useState(null);
   const webviewRef = useRef(null);
   const pendingImageUri = useRef(null);
+  const ocrTimeoutRef = useRef(null);
 
   const isEditing = editItem !== null;
 
@@ -128,7 +129,7 @@ export default function PrescriptionScreen({ route }) {
 
   function onRefresh() { setRefreshing(true); loadData(); }
 
-  function resetForm() { setForm(INITIAL_FORM); setEditItem(null); setShowForm(false); }
+  function resetForm() { setForm({ ...INITIAL_FORM, frequency: t('freq_once') }); setEditItem(null); setShowForm(false); }
 
   function openEdit(item) {
     setEditItem(item);
@@ -185,6 +186,14 @@ export default function PrescriptionScreen({ route }) {
     pendingImageUri.current = `data:image/jpeg;base64,${base64}`;
     setOcrBusy(true);
     setOcrProgress(0);
+    if (ocrTimeoutRef.current) clearTimeout(ocrTimeoutRef.current);
+    ocrTimeoutRef.current = setTimeout(() => {
+      if (pendingImageUri.current) {
+        setOcrBusy(false);
+        pendingImageUri.current = null;
+        Alert.alert(t('error'), 'OCR timed out. Please try again.');
+      }
+    }, 30000);
     setTimeout(() => {
       webviewRef.current?.postMessage(JSON.stringify({ imageUri: pendingImageUri.current }));
     }, 500);
@@ -205,6 +214,7 @@ export default function PrescriptionScreen({ route }) {
   }
 
   async function handleOCRResult(rawText) {
+    if (ocrTimeoutRef.current) { clearTimeout(ocrTimeoutRef.current); ocrTimeoutRef.current = null; }
     setOcrProgress(95);
     let parsed = null;
     if (rawText.length > 5) {
@@ -276,7 +286,7 @@ export default function PrescriptionScreen({ route }) {
       await loadData();
       resetForm();
       Alert.alert(t('saved_success_title'), t('saved_success'));
-    } catch (e) { Alert.alert('Error', e.message); }
+    } catch (e) {         Alert.alert(t('error'), e.message); }
     finally { setSaving(false); }
   }
 
