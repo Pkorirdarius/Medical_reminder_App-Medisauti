@@ -491,11 +491,15 @@ export async function addConditionPrescriptions(condition) {
 
 export async function syncConditionPrescriptions(condition) {
   const existing = await getPrescriptions();
+  const oldSystem = existing.filter(rx => rx.source === 'system');
   const manual = existing.filter(rx => rx.source !== 'system');
   const newSystem = generateSystemPrescriptions(condition);
   const merged = [...manual, ...newSystem];
   await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
   if (await isFB()) {
+    for (const rx of oldSystem) {
+      try { await supabase.fbDeletePrescription(getUid(), rx.id); } catch (_) {}
+    }
     for (const rx of newSystem) await supabase.fbSavePrescription(getUid(), rx);
   }
   return newSystem;
