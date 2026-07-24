@@ -182,7 +182,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       await saveUser(user);
 
       if (role === 'doctor') {
-        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin });
+        await saveDoctorProfile({ name: user.name, phone: user.phone, specialization: user.specialization, pin: user.pin, uid: sbUid });
         Alert.alert(t('registration_success'), t('registration_welcome').replace('{name}', user.name));
       } else {
         await clearUserData();

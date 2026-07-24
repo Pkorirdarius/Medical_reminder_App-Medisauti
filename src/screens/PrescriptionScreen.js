@@ -38,6 +38,45 @@ const DOSAGE_FORMS = [
   { key: 'patch', icon: 'bandage' },
 ];
 
+function PrescriptionCard({ item, onDelete, onEdit, COLORS, styles }) {
+  const { t } = useLanguage();
+  const dosageDetail = item.dosageQuantity
+    ? `${item.dosageQuantity} ${t('form_' + (item.dosageForm || 'tablet'))} · ${item.dosage}`
+    : item.dosage;
+  return (
+    <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
+      <View style={styles.medCard}>
+        <View style={styles.medCardHeader}>
+          <View style={styles.medCardLeft}>
+            <View style={styles.medIconWrap}>
+              <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
+              <Text style={styles.medCardSub}>{dosageDetail} · {item.frequency} · {item.times.join(', ')}</Text>
+            </View>
+            {item.source === 'doctor' && (
+              <View style={styles.docBadge}>
+                <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
+                <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
+              </View>
+            )}
+            {item.stock > 0 && item.stock <= 10 && (
+              <View style={[styles.docBadge, { backgroundColor: COLORS.amber[50] }]}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={12} color={COLORS.amber[800]} />
+                <Text style={[styles.docBadgeText, { color: COLORS.amber[800] }]}>{t('badge_low_stock')}</Text>
+              </View>
+            )}
+          </View>
+          <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
+            <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
+        </View>
+        {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 
 export default function PrescriptionScreen({ route }) {
@@ -64,46 +103,6 @@ export default function PrescriptionScreen({ route }) {
   const pendingImageUri = useRef(null);
 
   const isEditing = editItem !== null;
-
-  function PrescriptionCard({ item, onDelete, onEdit }) {
-    const { t } = useLanguage();
-    const dosageDetail = item.dosageQuantity
-      ? `${item.dosageQuantity} ${t('form_' + (item.dosageForm || 'tablet'))} · ${item.dosage}`
-      : item.dosage;
-    return (
-      <TouchableOpacity onPress={() => onEdit(item)} activeOpacity={0.7}>
-        <View style={styles.medCard}>
-          <View style={styles.medCardHeader}>
-            <View style={styles.medCardLeft}>
-              <View style={styles.medIconWrap}>
-                <MaterialCommunityIcons name="pill" size={22} color={COLORS.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.medCardName}>{item.drugName} {item.dosage}</Text>
-                <Text style={styles.medCardSub}>{dosageDetail} · {item.frequency} · {item.times.join(', ')}</Text>
-              </View>
-              {item.source === 'doctor' && (
-                <View style={styles.docBadge}>
-                  <MaterialCommunityIcons name="stethoscope" size={12} color={COLORS.blue[800]} />
-                  <Text style={styles.docBadgeText}>{t('source_doctor')}</Text>
-                </View>
-              )}
-              {item.stock > 0 && item.stock <= 10 && (
-                <View style={[styles.docBadge, { backgroundColor: COLORS.amber[50] }]}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={12} color={COLORS.amber[800]} />
-                  <Text style={[styles.docBadgeText, { color: COLORS.amber[800] }]}>{t('badge_low_stock')}</Text>
-                </View>
-              )}
-            </View>
-            <TouchableOpacity onPress={() => onDelete(item)} style={styles.deleteBtn}>
-              <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
-            </TouchableOpacity>
-          </View>
-          {item.notes ? <Text style={styles.medCardNotes}>{item.notes}</Text> : null}
-        </View>
-      </TouchableOpacity>
-    );
-  }
 
   useFocusEffect(useCallback(() => {
     loadData();
@@ -353,7 +352,7 @@ export default function PrescriptionScreen({ route }) {
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}
             >
               {prescriptions.map((item, i) => (
-                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} />
+                <PrescriptionCard key={item.id || i} item={item} onDelete={handleDelete} onEdit={openEdit} COLORS={COLORS} styles={styles} />
               ))}
             </ScrollView>
           )}

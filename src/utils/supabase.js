@@ -234,15 +234,10 @@ async function fbGetDoctorPatients(doctorUid) {
   if (!supabase) return [];
   const { data } = await supabase.from('my_doctor').select('*').eq('doctor_uid', doctorUid);
   if (!data || data.length === 0) return [];
-  const patientUids = data.map(r => r.user_id);
-  const patients = [];
-  for (const puid of patientUids) {
-    const { data: uData } = await supabase.from('users').select('*').eq('id', puid).maybeSingle();
-    if (uData) {
-      patients.push({ uid: puid, ...uData.data, phone: uData.phone });
-    }
-  }
-  return patients;
+  return data.map(r => {
+    const patient = r.data?.patient || {};
+    return { uid: r.user_id, ...patient };
+  }).filter(p => p.name);
 }
 
 async function fbGetUserByPhone(phone) {
@@ -269,14 +264,14 @@ async function fbGetPatientLogs(patientUid) {
   return (data || []).map(r => ({ id: r.id, ...r.data }));
 }
 
-async function fbSetMyDoctor(uid, doctor, doctorUid) {
+async function fbSetMyDoctor(uid, doctor, doctorUid, patientData) {
   if (!supabase) return;
   if (doctor) {
     await supabase.from('my_doctor').upsert({
       id: uid,
       user_id: uid,
       doctor_uid: doctorUid || null,
-      data: doctor,
+      data: { doctor, patient: patientData || null },
     });
   } else {
     await supabase.from('my_doctor').delete().eq('id', uid);

@@ -380,11 +380,13 @@ export async function setMyDoctor(doctor) {
     let doctorUid = doctor?.uid || null;
     if (!doctorUid && doctor?.phone) {
       try {
-        const found = await supabase.fbGetUserByPhone(doctor.phone);
+        const doctors = await getDoctors();
+        const found = doctors.find(d => d.phone === doctor.phone);
         if (found?.uid) doctorUid = found.uid;
       } catch (_) {}
     }
-    await supabase.fbSetMyDoctor(getUid(), doctor, doctorUid);
+    const patientData = await getUser();
+    await supabase.fbSetMyDoctor(getUid(), doctor, doctorUid, patientData);
   } else if (!doctor) {
     await AsyncStorage.removeItem(KEYS.MY_DOCTOR);
   }
@@ -393,15 +395,16 @@ export async function setMyDoctor(doctor) {
 export async function getDoctorPatients() {
   const u = await getUser();
   if (!u || u.role !== 'doctor') return [];
-  let doctorUid = u.uid || getUid();
-  if (!doctorUid && u.phone && await isFB()) {
-    try {
-      const found = await supabase.fbGetUserByPhone(u.phone);
-      if (found?.uid) doctorUid = found.uid;
-    } catch (_) {}
-  }
-  if (!doctorUid) return [];
   if (await isFB()) {
+    let doctorUid = u.uid || getUid();
+    if (!doctorUid && u.phone) {
+      try {
+        const doctors = await getDoctors();
+        const found = doctors.find(d => d.phone === u.phone);
+        if (found?.uid) doctorUid = found.uid;
+      } catch (_) {}
+    }
+    if (!doctorUid) return [];
     try {
       return await supabase.fbGetDoctorPatients(doctorUid);
     } catch (_) {}

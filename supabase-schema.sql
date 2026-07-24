@@ -88,9 +88,29 @@ CREATE POLICY "users_own_row" ON users
 CREATE POLICY "prescriptions_own" ON prescriptions
   FOR ALL USING (auth.uid() = user_id);
 
+-- Prescriptions: doctors can read their patients' prescriptions
+CREATE POLICY "prescriptions_doctor_read" ON prescriptions
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM my_doctor
+      WHERE my_doctor.user_id = prescriptions.user_id
+        AND my_doctor.doctor_uid = auth.uid()
+    )
+  );
+
 -- Adherence logs: authenticated users can manage their own
 CREATE POLICY "logs_own" ON adherence_logs
   FOR ALL USING (auth.uid() = user_id);
+
+-- Adherence logs: doctors can read their patients' logs
+CREATE POLICY "logs_doctor_read" ON adherence_logs
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM my_doctor
+      WHERE my_doctor.user_id = adherence_logs.user_id
+        AND my_doctor.doctor_uid = auth.uid()
+    )
+  );
 
 -- Schedules: authenticated users can manage their own
 CREATE POLICY "schedules_own" ON schedules
