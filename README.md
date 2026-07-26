@@ -1,17 +1,17 @@
 # MEDISAUTI
-### A Swahili Voice-Enabled Mobile App for Medication Adherence
+### Swahili Voice-Enabled Medication Adherence App for Patients & Doctors
 **Kabarak University — Computer Science & IT · Darius Korir Pilakan (CS/M/1149/09/23)**
 
 ---
 
-## Recommended Language: React Native (JavaScript/TypeScript)
+## Tech Stack
 
-React Native was chosen because:
-- **Cross-platform** — single codebase runs on Android 8+ and iOS 13+
-- **Expo ecosystem** — camera, speech, notifications, file system out of the box
-- **Tesseract.js** — on-device OCR runs in a hidden WebView (no server needed)
-- **AsyncStorage** — offline-first local data storage; no cloud required
-- **Expo Speech** — Swahili TTS (`sw-KE` locale) with English fallback
+- **React Native** (Expo managed workflow, JavaScript)
+- **Supabase** — cloud backend (auth, database, Edge Functions, RLS)
+- **Expo** ecosystem — camera, speech, notifications, file system, biometrics
+- **Tesseract.js** — on-device OCR via hidden WebView
+- **AI OCR** — cloud-based intelligent parsing via Gemini / GitHub Models (GPT-4o-mini)
+- **AsyncStorage** — offline-first local persistence & fallback storage
 
 ---
 
@@ -19,34 +19,96 @@ React Native was chosen because:
 
 ```
 medisauti/
-├── App.js                          # Entry point
-├── app.json                        # Expo configuration + permissions
-├── package.json                    # Dependencies
+├── App.js                              # Entry point — fonts, providers, navigation
+├── app.json                            # Expo configuration + plugins + permissions
+├── package.json                        # Dependencies
+├── supabase-schema.sql                 # Database schema (7 tables + RLS policies)
+├── .env                                # Environment variables (not committed)
+├── supabase/
+│   ├── functions/
+│   │   ├── send-sms/index.ts           # Edge Function — Twilio SMS verification
+│   │   └── verify-sms/index.ts        # Edge Function — verify SMS codes
+│   └── migrations/
+│       └── 001_security_hardening.sql  # Auth UIDs, audit log, RLS fixes
 └── src/
     ├── navigation/
-    │   └── AppNavigator.js         # Bottom tab navigation (4 screens)
+    │   └── AppNavigator.js             # Role-based navigation (patient/doctor tabs)
     ├── screens/
-    │   ├── HomeScreen.js           # Dashboard — next reminder, meds list, adherence bar
-    │   ├── PrescriptionScreen.js   # OCR scan + manual entry + saved prescriptions
-    │   ├── RemindersScreen.js      # Daily schedule, mark-as-taken/snooze/missed
-    │   └── ReportScreen.js         # Analytics, streak, PDF/HTML export for doctor
+    │   ├── LandingScreen.js            # Pre-auth welcome + language selection
+    │   ├── AuthScreen.js               # Registration, PIN login, biometrics, SMS reset
+    │   ├── HomeScreen.js               # Dashboard — next reminder, meds, adherence, doctor link
+    │   ├── ScanScreen.js               # Camera viewfinder, torch, gallery pick, recent scans
+    │   ├── PrescriptionScreen.js       # OCR scan + manual entry + edit + saved prescriptions
+    │   ├── RemindersScreen.js          # Daily schedule, mark-as-taken/snooze/missed
+    │   ├── ReportScreen.js             # Analytics, streak, PDF/JSON/CSV export, trends
+    │   ├── ProfileScreen.js            # Avatar, settings, notifications, theme, logout
+    │   ├── DoctorScreen.js             # Doctor dashboard — patient adherence, streaks, prescribe
+    │   ├── DoctorAnalyticsScreen.js    # Per-medication & per-condition analytics, trends
+    │   ├── PatientSearchScreen.js      # Doctor search patients by name/condition
+    │   └── PrescriptionScheduleScreen.js # Doctor issue prescriptions to patients
+    ├── components/
+    │   ├── ErrorBoundary.js            # React error boundary with recovery UI
+    │   └── OfflineIndicator.js         # Network status banner (NetInfo)
     └── utils/
-        ├── constants.js            # Design tokens — colors, radius, shadows
-        ├── storage.js              # AsyncStorage CRUD + adherence calculations
-        ├── reminders.js            # Expo Notifications + Expo Speech (Swahili TTS)
-        └── ocr.js                  # Tesseract.js WebView HTML + OCR text parser
+        ├── constants.js                # Design tokens — colors (light/dark), radius, shadows, fonts
+        ├── storage.js                  # AsyncStorage CRUD + Supabase sync + adherence calculations
+        ├── reminders.js                # Expo Notifications + Expo Speech (Swahili TTS)
+        ├── ocr.js                      # Tesseract.js WebView HTML + OCR text parser
+        ├── ai.js                       # AI OCR parsing — Gemini & GitHub Models (GPT-4o-mini)
+        ├── supabase.js                 # Supabase client — auth, CRUD, SMS, edge function calls
+        ├── lang.js                     # Bilingual localization dictionary (437+ keys, SW/EN)
+        ├── LanguageContext.js           # React context — Swahili/English i18n
+        ├── ThemeContext.js              # React context — dark/light theme with persistence
+        └── HighContrastContext.js       # React context — high-contrast accessibility mode
 ```
+
+---
+
+## Features
+
+### Patient Features
+- **Registration & PIN Login** — name, phone, age, medical condition; 4-digit PIN auth
+- **Biometric Login** — fingerprint/face via `expo-local-authentication` (opt-in)
+- **Prescription Management** — add/edit/delete meds with 10 dosage forms, duration, stock tracking
+- **Camera OCR Scan** — real-time viewfinder, torch toggle, gallery pick, recent scans history
+- **AI-Powered OCR** — Tesseract.js extracts text, then Gemini or GPT-4o-mini parses medication details intelligently
+- **Swahili/English Localization** — full bilingual UI (437+ translation keys), persisted to AsyncStorage
+- **Daily Reminders** — Expo Notifications with Swahili TTS (`sw-KE`), snooze, mark-as-taken/missed
+- **Adherence Tracking** — dose logging with timestamps, streak calculation, per-medication analytics
+- **Reports & Export** — HTML/PDF generation (`expo-print`), JSON/CSV data export, WhatsApp/email sharing
+- **Doctor Linking** — browse and link to a doctor for remote monitoring
+- **Dark Mode & High Contrast** — theme toggle, high-contrast accessibility mode for visually impaired
+- **Offline Indicator** — network status banner when connectivity is lost
+
+### Doctor Features
+- **Doctor Dashboard** — select patients, view adherence %, 7-day streaks, recent activity
+- **Per-Medication Analytics** — adherence breakdown by drug, source (doctor-issued vs. manual)
+- **Patient Search** — filter by condition (diabetes, BP, HIV), grouped results with color coding
+- **Prescription Scheduling** — issue prescriptions to patients with dosage, frequency, duration, start date
+- **Condition Analytics** — aggregate adherence by condition group, trend direction (improving/worsening)
+
+### Authentication & Security
+- **Role-Based Access** — separate patient/doctor navigation and capabilities
+- **PIN Reset via SMS** — Twilio Edge Functions send verification codes, verify, then reset PIN
+- **Brute-Force Protection** — 5-attempt lockout with 30-second cooldown
+- **Supabase RLS** — row-level security policies on all 7 tables
+- **Security Audit Log** — tracks security events in dedicated table
 
 ---
 
 ## Modules → Screens Mapping
 
-| Module (from proposal) | Screen/File | Key technology |
+| Module | Screen/File | Key Technology |
 |---|---|---|
-| Module 1: User Registration | `HomeScreen.js` (profile display) | AsyncStorage |
-| Module 2: Prescription OCR | `PrescriptionScreen.js` | Tesseract.js via WebView, Expo ImagePicker |
-| Module 3: Reminders + Swahili TTS | `RemindersScreen.js` + `reminders.js` | Expo Notifications, Expo Speech (`sw-KE`) |
-| Module 4: Adherence Tracking + PDF | `ReportScreen.js` + `storage.js` | Expo Sharing, HTML report generation |
+| Auth & Registration | `AuthScreen.js` + `LandingScreen.js` | AsyncStorage, Supabase Auth, Biometrics |
+| Prescription OCR | `ScanScreen.js` + `PrescriptionScreen.js` | Tesseract.js WebView, Gemini/GPT-4o-mini AI, ImagePicker |
+| Reminders + Swahili TTS | `RemindersScreen.js` + `reminders.js` | Expo Notifications, Expo Speech (`sw-KE`) |
+| Adherence Tracking + Reports | `ReportScreen.js` + `storage.js` | expo-print PDF, JSON/CSV export, expo-sharing |
+| Profile & Settings | `ProfileScreen.js` | ImagePicker, notification sounds, theme/lang toggle |
+| Doctor Dashboard | `DoctorScreen.js` | Per-patient adherence, streaks, prescribe |
+| Doctor Analytics | `DoctorAnalyticsScreen.js` | Per-medication, per-condition, trend analysis |
+| Patient Search | `PatientSearchScreen.js` | Condition filtering, full-text search |
+| Prescription Scheduling | `PrescriptionScheduleScreen.js` | DateTimePicker, date range, frequency presets |
 
 ---
 
@@ -57,6 +119,23 @@ medisauti/
 - npm or yarn
 - [Expo CLI](https://docs.expo.dev/get-started/installation/)
 - Expo Go app on your Android/iOS device (for development)
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# AI OCR (at least one required for AI parsing; falls back to regex without)
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
+EXPO_PUBLIC_GITHUB_PAT=your_github_pat
+
+# Supabase (optional; app works fully offline without these)
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+> **Note:** Without Supabase credentials, the app runs in offline-only mode using AsyncStorage.
+> Without AI keys, OCR falls back to regex-based parsing.
 
 ### Steps
 
@@ -71,7 +150,15 @@ npx expo start
 #    OR press 'a' for Android emulator / 'i' for iOS simulator
 ```
 
-### Building for production (APK / IPA)
+### Database Setup (Supabase)
+
+1. Create a project at [supabase.com](https://supabase.com)
+2. Run `supabase-schema.sql` in the SQL Editor
+3. Run `supabase/migrations/001_security_hardening.sql`
+4. Deploy Edge Functions: `supabase functions deploy send-sms` and `supabase functions deploy verify-sms`
+5. Copy your project URL and anon key into `.env`
+
+### Building for Production
 
 ```bash
 # Install EAS CLI
@@ -91,48 +178,62 @@ eas build --platform ios
 
 ## Key Design Decisions
 
-### Offline-First Architecture
-All core functions (viewing prescriptions, receiving reminders, logging doses,
-generating reports) work without internet. Data is stored locally via AsyncStorage.
+### Hybrid Cloud + Offline Architecture
+The app operates in two modes:
+- **With Supabase configured** — data syncs to cloud, enables doctor-patient features, SMS verification
+- **Without Supabase** — fully offline via AsyncStorage; all core features work without internet
 
-### OCR via WebView
-Tesseract.js requires a browser JavaScript environment. We run it inside a hidden
-`react-native-webview` WebView that loads Tesseract from CDN on first use. The
-WebView posts progress and results back to the React Native layer via `onMessage`.
+### AI-Powered OCR Pipeline
+1. Tesseract.js runs in a hidden WebView to extract raw text from camera captures
+2. Raw text is sent to Gemini (gemini-2.0-flash) or GitHub Models (GPT-4o-mini) for intelligent parsing
+3. AI extracts drug name, dosage, form, frequency, and schedule times as structured JSON
+4. Falls back to regex parsing when no AI provider is configured
 
 ### Swahili TTS
 `expo-speech` supports the `sw-KE` language code. If the device's TTS engine
 does not support Swahili, the code gracefully falls back to English (`en-US`).
 
-### Adherence Logging
-Every dose event (taken / missed / snoozed) is logged with a timestamp to
-AsyncStorage. `calcAdherence()` and `getDailyStreak()` derive analytics from
-these logs entirely on-device.
+### Bilingual Localization
+437+ translation keys in `lang.js` cover all UI strings in both Swahili and English.
+Language preference is persisted to AsyncStorage and toggleable from any screen.
 
-### PDF Export
-Reports are generated as HTML strings and saved via `expo-file-system`, then
-shared via `expo-sharing` (which opens the native share sheet — WhatsApp, Gmail,
-SMS, etc.). For true PDF, replace with `react-native-html-to-pdf` in production.
+### Role-Based Navigation
+Patient and doctor roles have completely separate tab navigation and screen sets.
+Doctors see analytics and patient management; patients see reminders and medication management.
+
+### Adherence Logging
+Every dose event (taken / missed / snoozed) is logged with a timestamp.
+`calcAdherence()`, `getDailyStreak()`, `getPerMedicationAdherence()`, and `getAdherenceTrend()`
+derive analytics entirely on-device from these logs.
+
+### PDF & Data Export
+Reports are generated as HTML via `expo-print` for native PDF generation.
+Additional export formats include JSON and CSV via `expo-file-system`.
+Sharing uses the native share sheet (WhatsApp, Gmail, SMS, etc.).
 
 ---
 
-## Sprint Plan (from proposal)
+## Database Schema
 
-| Sprint | Duration | Focus |
-|---|---|---|
-| 1 | Weeks 1–2 | Auth, registration, AsyncStorage persistence |
-| 2 | Weeks 3–4 | OCR integration, prescription management |
-| 3 | Weeks 5–6 | Reminder scheduling, Swahili TTS, notifications |
-| 4 | Weeks 7–8 | Adherence logging, analytics, PDF export |
-| 5 | Weeks 9–10 | UI polish, accessibility, device testing |
+7 tables with Row-Level Security:
+
+| Table | Purpose |
+|---|---|
+| `users` | Patient/doctor profiles (UUID auth, phone, JSONB data) |
+| `prescriptions` | Medication records per user |
+| `adherence_logs` | Dose events (taken/missed/snoozed) with timestamps |
+| `doctors` | Doctor profiles linked by phone |
+| `schedules` | Reminder schedules per user |
+| `my_doctor` | Patient-doctor relationships |
+| `condition_presets` | Default prescriptions per medical condition |
 
 ---
 
 ## Notes for Supervisor
 
-- The `HomeScreen.js` import path for `reminders.js` has a typo in the path
-  (`'../utilsinders/reminders'`) — correct to `'../utils/reminders'` before running.
-- Tesseract.js OCR requires internet on first load (CDN). For fully offline OCR,
-  bundle the Tesseract WASM and `eng.traineddata` as Expo assets.
 - Push notifications require a physical device; they will not fire in Expo Go on
   some Android simulators.
+- Tesseract.js OCR requires internet on first load (CDN). For fully offline OCR,
+  bundle the Tesseract WASM and `eng.traineddata` as Expo assets.
+- The `android/` directory exists from a local `expo prebuild` — the app can also
+  be built locally without EAS.
