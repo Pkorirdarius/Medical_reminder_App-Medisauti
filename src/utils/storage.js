@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
+import { AESEncryptionKey, AESSealedData, aesEncryptAsync, aesDecryptAsync } from 'expo-crypto';
 import * as supabase from './supabase';
 
 const _locks = {};
@@ -11,35 +12,20 @@ function withLock(key, fn) {
   return chain;
 }
 
-// ── Encryption ────────────────────────────────────────────────
-// Uses expo-crypto (SHA-256) for hashing and expo-secure-store (AES-256)
-// for key storage. Data at rest uses XOR with a random device-bound key
-// stored in SecureStore. This replaces the old hardcoded-key XOR.
+// ── Encryption (AES-256-GCM via expo-crypto) ──────────────────
+// Key stored in SecureStore (hardware-backed). Data at rest uses
+// AES-GCM with 256-bit keys for proper encryption.
 const ENC_KEY_STORE = 'medisauti:enc_key';
 const PIN_SALT_STORE = 'medisauti:pin_salt';
 const PIN_HASH_STORE = 'medisauti:pin_hash';
 const SB_PASS_STORE = 'medisauti:sb_password';
 
-async function getEncryptionKey() {
-  let key = await SecureStore.getItemAsync(ENC_KEY_STORE);
-  if (!key) {
-    // Generate 32 random bytes as hex string
-    const bytes = [];
-    for (let i = 0; i < 32; i++) {
-      bytes.push(Math.floor(Math.random() * 256));
-    }
-    key = bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-    await SecureStore.setItemAsync(ENC_KEY_STORE, key);
-  }
-  return key;
+function utf8ToB64(str) {
+  return btoa(unescape(encodeURIComponent(str)));
 }
 
-function xorEncrypt(text, key) {
-  let out = '';
-  for (let i = 0; i < text.length; i++) {
-    out += String.fromCharCode(text.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-  }
-  return out;
+function b64ToUtf8(b64) {
+  return decodeURIComponent(escape(atob(b64)));
 }
 
 function b64Encode(str) {
@@ -75,29 +61,52 @@ function b64Decode(str) {
   return out;
 }
 
+async function getAesKey() {
+  let keyHex = await SecureStore.getItemAsync(ENC_KEY_STORE);
+  if (!keyHex) {
+    const key = await AESEncryptionKey.generate(256);
+    keyHex = await key.encoded('hex');
+    await SecureStore.setItemAsync(ENC_KEY_STORE, keyHex);
+  }
+  return AESEncryptionKey.import(keyHex, 'hex');
+}
+
 async function encrypt(text) {
-  const key = await getEncryptionKey();
-  const xored = xorEncrypt(text, key);
-  return b64Encode(unescape(encodeURIComponent(xored)));
+  const key = await getAesKey();
+  const b64Input = utf8ToB64(text);
+  const sealed = await aesEncryptAsync(b64Input, key);
+  return sealed.combined('base64');
 }
 
 async function decrypt(ciphertext, storageKey) {
+  if (!ciphertext) return { plain: '', migrated: false };
   try {
-    const key = await getEncryptionKey();
-    const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
-    return { plain: xorEncrypt(xored, key), migrated: false };
+    const key = await getAesKey();
+    const sealed = AESSealedData.fromCombined(ciphertext, { ivLength: 12, tagLength: 16 });
+    const b64Result = await aesDecryptAsync(sealed, key, { output: 'base64' });
+    const plain = b64ToUtf8(b64Result);
+    return { plain, migrated: false };
   } catch {
-    // Try legacy decryption (old hardcoded key) for migration
+    // Try legacy XOR decryption for migration from old format
     try {
-      const LEGACY_KEY = 'medisauti-2024-enc-key!';
-      const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
-      const plain = xorEncrypt(xored, LEGACY_KEY);
-      // Re-encrypt with new key and save immediately to prevent data loss
-      if (storageKey && plain) {
-        const reEncrypted = await encrypt(plain);
-        AsyncStorage.setItem(storageKey, reEncrypted).catch(() => {});
+      const legacyKeys = ['medisauti-2024-enc-key!'];
+      for (const legacyKey of legacyKeys) {
+        try {
+          const xored = decodeURIComponent(escape(b64Decode(ciphertext)));
+          let plain = '';
+          for (let i = 0; i < xored.length; i++) {
+            plain += String.fromCharCode(xored.charCodeAt(i) ^ legacyKey.charCodeAt(i % legacyKey.length));
+          }
+          if (plain) {
+            if (storageKey) {
+              const reEncrypted = await encrypt(plain);
+              AsyncStorage.setItem(storageKey, reEncrypted).catch(() => {});
+            }
+            return { plain, migrated: true };
+          }
+        } catch {}
       }
-      return { plain, migrated: true };
+      return { plain: '', migrated: false };
     } catch {
       return { plain: '', migrated: false };
     }
@@ -240,7 +249,7 @@ export async function getPrescriptions(targetUid) {
       remote = targetUid
         ? (await supabase.sbGetPatientPrescriptions(targetUid)) || []
         : (await supabase.sbGetPrescriptions(getUid())) || [];
-    } catch (_) {}
+    } catch (e) { console.warn('Remote getPrescriptions failed:', e.message); }
     if (remote.length === 0) return local;
     const byId = new Map();
     for (const item of remote) byId.set(item.id, item);
@@ -271,7 +280,7 @@ export async function savePrescription(prescription, targetUid) {
     await setItemEncrypted(KEYS.PRESCRIPTIONS, list);
     if (await isFB()) {
       const uid = targetUid || getUid();
-      try { await supabase.sbSavePrescription(uid, prescription); } catch (_) {}
+      try { await supabase.sbSavePrescription(uid, prescription); } catch (e) { console.warn('Remote save failed:', e.message); }
     }
   });
 }
@@ -282,7 +291,7 @@ export async function deletePrescription(id) {
     const updated = list.filter(p => p.id !== id);
     await setItemEncrypted(KEYS.PRESCRIPTIONS, updated);
     if (await isFB()) {
-      try { await supabase.sbDeletePrescription(getUid(), id); } catch (_) {}
+      try { await supabase.sbDeletePrescription(getUid(), id); } catch (e) { console.warn('Remote delete failed:', e.message); }
     }
   });
 }
@@ -296,7 +305,7 @@ export async function getLogs(targetUid) {
       remote = targetUid
         ? (await supabase.sbGetPatientLogs(targetUid)) || []
         : (await supabase.sbGetLogs(getUid())) || [];
-    } catch (_) {}
+    } catch (e) { console.warn('Remote getLogs failed:', e.message); }
     if (remote.length === 0) return local;
     const byId = new Map();
     for (const item of remote) byId.set(item.id, item);
@@ -328,7 +337,7 @@ export async function logDose(prescriptionId, status, scheduledTime) {
     logs.push(logEntry);
     await setItemEncrypted(KEYS.ADHERENCE, logs);
     if (await isFB()) {
-      try { await supabase.sbLogDose(getUid(), prescriptionId, status, scheduledTime); } catch (_) {}
+      try { await supabase.sbLogDose(getUid(), prescriptionId, status, scheduledTime); } catch (e) { console.warn('Remote logDose failed:', e.message); }
     }
   });
 }
@@ -520,7 +529,7 @@ export async function setMyDoctor(doctor) {
         const doctors = await getDoctors();
         const found = doctors.find(d => d.phone === doctor.phone);
         if (found?.uid) doctorUid = found.uid;
-      } catch (_) {}
+      } catch (e) { console.warn('Doctor lookup uid failed:', e.message); }
     }
     const patientData = await getUser();
     await supabase.sbSetMyDoctor(getUid(), doctor, doctorUid, patientData);
@@ -539,12 +548,12 @@ export async function getDoctorPatients() {
         const doctors = await getDoctors();
         const found = doctors.find(d => d.phone === u.phone);
         if (found?.uid) doctorUid = found.uid;
-      } catch (_) {}
+      } catch (e) { console.warn('Doctors fetch for uid failed:', e.message); }
     }
     if (!doctorUid) return [];
     try {
       return await supabase.sbGetDoctorPatients(doctorUid);
-    } catch (_) {}
+    } catch (e) { console.warn('Doctor patients fetch failed:', e.message); }
   }
   return [];
 }
@@ -606,7 +615,7 @@ export async function addConditionPrescriptions(condition, t) {
   await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
   if (await isFB()) {
     for (const rx of created) {
-      try { await supabase.sbSavePrescription(getUid(), rx); } catch (_) {}
+      try { await supabase.sbSavePrescription(getUid(), rx); } catch (e) { console.warn('Remote save condition rx failed:', e.message); }
     }
   }
   return created;
@@ -621,7 +630,7 @@ export async function syncConditionPrescriptions(condition, t) {
   await setItemEncrypted(KEYS.PRESCRIPTIONS, merged);
   if (await isFB()) {
     for (const rx of oldSystem) {
-      try { await supabase.sbDeletePrescription(getUid(), rx.id); } catch (_) {}
+      try { await supabase.sbDeletePrescription(getUid(), rx.id); } catch (e) { console.warn('Remote delete during sync failed:', e.message); }
     }
     for (const rx of newSystem) await supabase.sbSavePrescription(getUid(), rx);
   }
@@ -670,16 +679,15 @@ export async function enforceExpiredPrescriptions() {
   for (const rx of prescriptions) {
     if (rx.active === false) continue;
     if (!rx.durationValue || !rx.startDate) continue;
-    const start = new Date(rx.startDate);
     const dur = parseInt(rx.durationValue, 10);
     if (!dur) continue;
-    let ms;
+    const end = new Date(start);
     switch (rx.durationUnit) {
-      case 'weeks': ms = dur * 7 * 86400000; break;
-      case 'months': ms = dur * 30 * 86400000; break;
-      default: ms = dur * 86400000;
+      case 'weeks': end.setDate(end.getDate() + dur * 7); break;
+      case 'months': end.setMonth(end.getMonth() + dur); break;
+      default: end.setDate(end.getDate() + dur); break;
     }
-    if (now.getTime() > start.getTime() + ms) {
+    if (now.getTime() > end.getTime()) {
       rx.active = false;
       changed = true;
     }

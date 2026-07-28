@@ -49,6 +49,7 @@ export default function AuthScreen({ onAuthSuccess, route }) {
   const [newConfirmPin, setNewConfirmPin] = useState('');
   const [resetUid, setResetUid] = useState(null);
   const [resetting, setResetting] = useState(false);
+  const [logining, setLogining] = useState(false);
   const failedAttempts = useRef(0);
   const lockoutUntil = useRef(0);
 
@@ -102,6 +103,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       if (result.success) {
         const u = await getUser();
         const role = u?.role || loginRole;
+        // Authenticate Supabase session silently with stored credentials
+        if (sbConfigured() && u?.phone) {
+          const sbPassword = await getSupabasePassword();
+          if (sbPassword) {
+            try { await sbLogin(u.phone, sbPassword); } catch (e) { console.warn('Biometric supabase re-auth failed:', e.message); }
+          }
+        }
         Alert.alert(t('success'), t('welcome_back'));
         onAuthSuccess(role);
       }
@@ -184,12 +192,9 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         biometricEnabled: optInBio,
       };
 
-      // Generate random Supabase password (never store raw PIN as password)
-      const sbPassword = await generateRandomPassword();
-      await storeSupabasePassword(sbPassword);
-
       let sbUid = null;
       if (sbConfigured()) {
+        // Use PIN hash as Supabase password — it's a SHA-256 hash, not raw PIN
         sbUid = await sbRegister(phone.trim(), pinHash, user);
         await storeSupabasePassword(pinHash);
       }
@@ -203,10 +208,10 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         await clearUserData();
         const added = await addConditionPrescriptions(user.condition);
         if (added.length > 0) {
-          try { await cancelAllReminders(); } catch (_) {}
+          try { await cancelAllReminders(); } catch (e) { console.warn('Cancel reminders failed:', e.message); }
           for (const rx of added) {
             for (const time of rx.times || []) {
-              try { await scheduleReminder(rx, time, language); } catch (_) {}
+              try { await scheduleReminder(rx, time, language); } catch (e) { console.warn('Schedule reminder failed:', e.message); }
             }
           }
           Alert.alert(t('auto_added_title'), t('auto_added_body').replace('{condition}', user.condition));
@@ -224,6 +229,13 @@ export default function AuthScreen({ onAuthSuccess, route }) {
       Alert.alert(t('invalid_pin'), `${t('invalid_pin')}. ${t('fill_all_fields')}`);
       return;
     }
+    // Universal rate limiting (applies to both local and Supabase login)
+    if (Date.now() < lockoutUntil.current) {
+      const secs = Math.ceil((lockoutUntil.current - Date.now()) / 1000);
+      Alert.alert(t('error'), `Too many attempts. Try again in ${secs}s.`);
+      return;
+    }
+    setLogining(true);
     try {
       if (sbConfigured()) {
         const pinHash = await hashPin(loginPin);
@@ -232,25 +244,18 @@ export default function AuthScreen({ onAuthSuccess, route }) {
         if (previousUser && previousUser.phone && previousUser.phone !== loginPhone) {
           await clearUserData();
         }
-        let remoteUser = await getUser();
-        if (!remoteUser || (previousUser && previousUser.phone !== loginPhone)) {
-          const sbClient = getSupabaseClient();
-          if (sbClient) {
-            const { data } = await sbClient.from('users').select('*').eq('id', uid).maybeSingle();
-            if (data) remoteUser = { uid, ...data.data, phone: data.phone };
-          }
+        let remoteUser = null;
+        const sbClient = getSupabaseClient();
+        if (sbClient && uid) {
+          const { data } = await sbClient.from('users').select('*').eq('id', uid).maybeSingle();
+          if (data) remoteUser = { uid, ...data.data, phone: data.phone };
         }
         if (!remoteUser) {
-          remoteUser = { uid, phone: loginPhone, role: 'patient', name: loginPhone, createdAt: new Date().toISOString() };
+          throw new Error('User account not found. Please register again.');
         }
         await saveUser(remoteUser);
         onAuthSuccess(remoteUser.role || 'patient');
       } else {
-        if (Date.now() < lockoutUntil.current) {
-          const secs = Math.ceil((lockoutUntil.current - Date.now()) / 1000);
-          Alert.alert(t('error'), `Too many attempts. Try again in ${secs}s.`);
-          return;
-        }
         const user = await getUser();
         if (!user) {
           Alert.alert(t('error'), t('no_account_found'));
@@ -301,14 +306,21 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     } catch (e) {
       const msg = (e.message || '').toLowerCase();
       if (msg.includes('invalid login') || msg.includes('credentials') || msg.includes('wrong password')) {
-        Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
-          { text: t('forgot_pin'), onPress: startReset },
-          { text: 'OK' },
-        ]);
+        failedAttempts.current++;
+        if (failedAttempts.current >= 5) {
+          lockoutUntil.current = Date.now() + 30000;
+          failedAttempts.current = 0;
+          Alert.alert(t('error'), 'Too many failed attempts. Locked for 30 seconds.');
+        } else {
+          Alert.alert(t('wrong_pin'), t('wrong_pin_body'), [
+            { text: t('forgot_pin'), onPress: startReset },
+            { text: 'OK' },
+          ]);
+        }
       } else {
         Alert.alert(t('error'), e.message);
       }
-    }
+    } finally { setLogining(false); }
   }
 
   // ── Forgot PIN (real SMS verification) ──────────────────────
@@ -587,8 +599,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
                   <FormInput label={t('label_phone')} value={loginPhone} onChangeText={setLoginPhone} placeholder={t('placeholder_phone')} keyboardType="phone-pad" containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
                   <FormInput label={t('label_your_pin')} value={loginPin} onChangeText={v => setLoginPin(v.replace(/\D/g, '').slice(0, PIN_LENGTH))} placeholder="****" keyboardType="number-pad" secureTextEntry containerStyle={styles.inputRow} labelStyle={styles.label} inputStyle={styles.input} placeholderColor={COLORS.outline} />
 
-                  <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
-                    <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>
+                  <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin} disabled={logining}>
+                    {logining ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('btn_login')}</Text>}
                   </TouchableOpacity>
 
                   <TouchableOpacity style={styles.switchBtn} onPress={startReset}>

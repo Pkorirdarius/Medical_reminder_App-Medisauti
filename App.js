@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, Appearance } from 'react-native';
 import * as Font from 'expo-font';
 import {
   Lexend_400Regular, Lexend_500Medium, Lexend_600SemiBold,
@@ -53,10 +53,14 @@ export default function App() {
   }, []);
 
   if (!fontsLoaded) {
+    const colorScheme = Appearance.getColorScheme();
+    const isDarkSplash = colorScheme === 'dark';
+    const splashBg = isDarkSplash ? '#0d1117' : '#f9faf5';
+    const splashColor = isDarkSplash ? '#5ed4b0' : '#00513f';
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9faf5' }}>
-        <Text style={{ fontSize: 28, fontFamily: 'Lexend-ExtraBold', color: '#00513f', marginBottom: 16 }}>MEDISAUTI</Text>
-        <ActivityIndicator size="large" color="#00513f" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: splashBg }}>
+        <Text style={{ fontSize: 28, fontFamily: 'Lexend-ExtraBold', color: splashColor, marginBottom: 16 }}>MEDISAUTI</Text>
+        <ActivityIndicator size="large" color={splashColor} />
       </View>
     );
   }

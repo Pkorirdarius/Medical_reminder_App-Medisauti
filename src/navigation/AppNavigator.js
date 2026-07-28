@@ -140,7 +140,7 @@ export default function AppNavigator() {
             setUserRole(u.role || 'patient');
           }
         }
-      } catch (_) {}
+      } catch (e) { console.warn('getIsRegistered check failed:', e.message); }
       setReady(true);
     })();
   }, []);
@@ -155,7 +155,7 @@ export default function AppNavigator() {
     try {
       const { clearUserData } = await import('../utils/storage');
       await clearUserData();
-    } catch (_) {}
+    } catch (e) { console.warn('Logout data clear failed:', e.message); }
     setAuthenticated(false);
     setUserRole('patient');
   }
