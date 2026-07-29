@@ -8,9 +8,10 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { RADIUS, FONT } from '../utils/constants';
-import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors, clearUserData, hashPin, storePinHash, getStoredPinHash, generateRandomPassword, storeSupabasePassword, getSupabasePassword } from '../utils/storage';
-import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient, sendSmsCode, verifySmsCode } from '../utils/supabase';
+import { saveUser, getUser, getIsRegistered, addConditionPrescriptions, saveDoctorProfile, getDoctors, clearUserData, hashPin, storePinHash, getStoredPinHash, generateRandomPassword, storeSupabasePassword, getSupabasePassword, getPrescriptions, getMyDoctor, getLogs, setCachedUid } from '../utils/storage';
+import { isConfigured as sbConfigured, registerUser as sbRegister, loginUser as sbLogin, getClient as getSupabaseClient, makeEmail, sendSmsCode, verifySmsCode } from '../utils/supabase';
 import { scheduleReminder, cancelAllReminders } from '../utils/reminders';
+import * as Crypto from 'expo-crypto';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -239,7 +240,24 @@ export default function AuthScreen({ onAuthSuccess, route }) {
     try {
       if (sbConfigured()) {
         const pinHash = await hashPin(loginPin);
-        const uid = await sbLogin(loginPhone, pinHash);
+        let uid;
+        try {
+          uid = await sbLogin(loginPhone, pinHash);
+        } catch (_loginErr) {
+          // Fallback for accounts created externally (salt mismatch)
+          const email = makeEmail(loginPhone);
+          const fallbackPw = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256, `ms:${loginPin}`
+          );
+          const { data: fbData, error: fbErr } = await getSupabaseClient().auth.signInWithPassword({
+            email, password: fallbackPw,
+          });
+          if (fbErr || !fbData?.user) throw _loginErr;
+          uid = fbData.user.id;
+          // Sync password to local hash for future logins
+          try { await getSupabaseClient().auth.updateUser({ password: pinHash }); } catch { }
+        }
+        setCachedUid(uid);
         const previousUser = await getUser();
         if (previousUser && previousUser.phone && previousUser.phone !== loginPhone) {
           await clearUserData();
@@ -254,6 +272,8 @@ export default function AuthScreen({ onAuthSuccess, route }) {
           throw new Error('User account not found. Please register again.');
         }
         await saveUser(remoteUser);
+        // Preload data from Supabase into local cache so it survives offline
+        try { await Promise.all([getPrescriptions(), getMyDoctor(), getLogs()]); } catch (_) {}
         onAuthSuccess(remoteUser.role || 'patient');
       } else {
         const user = await getUser();

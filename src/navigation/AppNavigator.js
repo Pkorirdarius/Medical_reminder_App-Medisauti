@@ -117,7 +117,8 @@ export default function AppNavigator() {
     if (sbConfigured()) {
       const unsub = onAuthChanged(async user => {
         if (user) {
-          const { getUser } = await import('../utils/storage');
+          const { getUser, setCachedUid } = await import('../utils/storage');
+          setCachedUid(user.id);
           const u = await getUser();
           if (u) {
             setAuthenticated(true);
@@ -152,10 +153,6 @@ export default function AppNavigator() {
 
   async function handleLogout() {
     if (sbConfigured()) await sbLogout();
-    try {
-      const { clearUserData } = await import('../utils/storage');
-      await clearUserData();
-    } catch (e) { console.warn('Logout data clear failed:', e.message); }
     setAuthenticated(false);
     setUserRole('patient');
   }

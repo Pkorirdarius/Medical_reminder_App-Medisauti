@@ -6,12 +6,13 @@
 
 ## Tech Stack
 
-- **React Native** (Expo managed workflow, JavaScript)
+- **React Native** (Expo managed workflow, JavaScript, Hermes engine)
 - **Supabase** — cloud backend (auth, database, Edge Functions, RLS)
 - **Expo** ecosystem — camera, speech, notifications, file system, biometrics
 - **Tesseract.js** — on-device OCR via hidden WebView
 - **AI OCR** — cloud-based intelligent parsing via Gemini / GitHub Models (GPT-4o-mini)
-- **AsyncStorage** — offline-first local persistence & fallback storage
+- **aes-js** — AES-256-CTR encryption for local storage at rest (Hermes-compatible)
+- **AsyncStorage** + **expo-secure-store** — offline-first local persistence & hardware-backed key storage
 
 ---
 
@@ -51,7 +52,7 @@ medisauti/
     │   └── OfflineIndicator.js         # Network status banner (NetInfo)
     └── utils/
         ├── constants.js                # Design tokens — colors (light/dark), radius, shadows, fonts
-        ├── storage.js                  # AsyncStorage CRUD + Supabase sync + adherence calculations
+        ├── storage.js                  # AES-encrypted AsyncStorage CRUD + Supabase sync + adherence calculations
         ├── reminders.js                # Expo Notifications + Expo Speech (Swahili TTS)
         ├── ocr.js                      # Tesseract.js WebView HTML + OCR text parser
         ├── ai.js                       # AI OCR parsing — Gemini & GitHub Models (GPT-4o-mini)
@@ -183,6 +184,23 @@ The app operates in two modes:
 - **With Supabase configured** — data syncs to cloud, enables doctor-patient features, SMS verification
 - **Without Supabase** — fully offline via AsyncStorage; all core features work without internet
 
+### Supabase Data Flow (v2 API Compatibility)
+The app uses `@supabase/supabase-js` v2.110.0, which removed the synchronous `auth.currentUser`
+property. All Supabase data queries (prescriptions, doctor links, adherence logs) depend on a cached
+user UID (`_cachedUid` in `storage.js`) that is set:
+- On successful login (`AuthScreen.handleLogin()`)
+- On session restore from AsyncStorage (`AppNavigator.onAuthChanged`)
+- On first load after app restart
+
+Without this cache, `isFB()` returns `false` and the app silently falls back to local-only mode,
+even with valid Supabase credentials. See `getUid()` in `src/utils/storage.js:225`.
+
+### Offline Persistence
+User data (prescriptions, adherence logs, doctor selection, schedules) is **not cleared on logout**.
+Logout only terminates the Supabase session and cancels notification timers. On re-login, data is
+proactively synced from Supabase and cached locally. This prevents data loss during normal logout/login
+cycles. Local data is only purged on user switch (different phone number) or explicit app reinstall.
+
 ### AI-Powered OCR Pipeline
 1. Tesseract.js runs in a hidden WebView to extract raw text from camera captures
 2. Raw text is sent to Gemini (gemini-2.0-flash) or GitHub Models (GPT-4o-mini) for intelligent parsing
@@ -200,6 +218,14 @@ Language preference is persisted to AsyncStorage and toggleable from any screen.
 ### Role-Based Navigation
 Patient and doctor roles have completely separate tab navigation and screen sets.
 Doctors see analytics and patient management; patients see reminders and medication management.
+
+### Hermes Engine Compatibility
+The app targets Hermes (React Native 0.73.6), which lacks `TextEncoder`/`TextDecoder`,
+`btoa`/`atob`, and the `AESEncryptionKey` API from newer `expo-crypto` versions.
+Manual implementations replace these:
+- Base64 encoding/decoding via byte-level `bytesToB64`/`b64ToBytes`
+- UTF-8 conversion via `utf8ToBytes`/`bytesToUtf8` (using `encodeURIComponent`/`unescape`)
+- AES-256-CTR via `aes-js` library instead of `expo-crypto`'s AES-GCM
 
 ### Adherence Logging
 Every dose event (taken / missed / snoozed) is logged with a timestamp.

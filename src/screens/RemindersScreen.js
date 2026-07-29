@@ -290,7 +290,7 @@ function getStyles(C) {
     avatar:         { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryContainer, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: C.primary + '20' },
     avatarText:     { fontSize: 12, fontFamily: FONT.bodyBold, color: '#fff' },
 
-    scrollContent:  { padding: 16, paddingBottom: 100, flexGrow: 1 },
+    scrollContent:  { padding: 16, paddingBottom: 20, flexGrow: 1 },
 
     legend:         { flexDirection: 'row', gap: 16, marginBottom: 16 },
     legendItem:     { flexDirection: 'row', alignItems: 'center', gap: 4 },

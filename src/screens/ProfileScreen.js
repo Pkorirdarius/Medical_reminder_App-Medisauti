@@ -161,10 +161,6 @@ export default function ProfileScreen({ onLogout }) {
         text: t('btn_logout'), style: 'destructive',
         onPress: async () => {
           try { await cancelAllReminders(); } catch (_) {}
-          try {
-            const { clearUserData } = await import('../utils/storage');
-            await clearUserData();
-          } catch (_) {}
           if (onLogout) {
             onLogout();
           } else {

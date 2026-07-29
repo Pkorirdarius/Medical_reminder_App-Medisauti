@@ -498,7 +498,7 @@ function getStyles(C) {
     backBtn: { width: 40, height: 40, borderRadius: 100, alignItems: 'center', justifyContent: 'center' },
     headerTitle: { fontSize: 20, fontFamily: FONT.headline, color: C.onSurface, letterSpacing: -0.5, flex: 1 },
 
-    scrollContent: { padding: 16, gap: 16, paddingBottom: 40 },
+    scrollContent: { padding: 16, gap: 16, paddingBottom: 20, flexGrow: 1 },
 
     patientCard: {
       flexDirection: 'row', alignItems: 'center', gap: 12,

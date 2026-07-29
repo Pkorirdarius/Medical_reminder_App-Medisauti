@@ -54,8 +54,12 @@ function getAuthInstance() {
   return supabase?.auth || null;
 }
 
-function getCurrentUser() {
-  return supabase?.auth?.currentUser || null;
+async function getCurrentUser() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user || null;
+  } catch (e) { console.warn('getSession failed:', e.message); }
+  return null;
 }
 
 function getClient() {
@@ -327,7 +331,7 @@ async function sbDeleteAllUserData(uid) {
 }
 
 export {
-  isConfigured, init,
+  isConfigured, init, makeEmail,
   getAuthInstance, getCurrentUser, getClient, registerUser, loginUser, logoutUser, onAuthChanged, updateUserPassword,
   sendSmsCode, verifySmsCode,
   sbGetUser, sbSaveUser,
