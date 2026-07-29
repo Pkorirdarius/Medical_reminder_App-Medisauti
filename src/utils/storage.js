@@ -15,10 +15,10 @@ function withLock(key, fn) {
 // ── Encryption (AES-256-GCM via expo-crypto) ──────────────────
 // Key stored in SecureStore (hardware-backed). Data at rest uses
 // AES-GCM with 256-bit keys for proper encryption.
-const ENC_KEY_STORE = 'medisauti:enc_key';
-const PIN_SALT_STORE = 'medisauti:pin_salt';
-const PIN_HASH_STORE = 'medisauti:pin_hash';
-const SB_PASS_STORE = 'medisauti:sb_password';
+const ENC_KEY_STORE = 'medisauti.enc_key';
+const PIN_SALT_STORE = 'medisauti.pin_salt';
+const PIN_HASH_STORE = 'medisauti.pin_hash';
+const SB_PASS_STORE = 'medisauti.sb_password';
 
 function utf8ToB64(str) {
   return btoa(unescape(encodeURIComponent(str)));

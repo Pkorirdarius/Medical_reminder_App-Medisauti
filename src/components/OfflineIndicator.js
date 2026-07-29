@@ -22,7 +22,7 @@ export default function OfflineIndicator() {
         useNativeDriver: true,
       }).start();
     });
-    return () => sub.remove();
+    return () => sub();
   }, []);
 
   if (!isOffline) return null;

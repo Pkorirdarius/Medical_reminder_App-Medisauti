@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useMemo, useEffect } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS as BASE } from './constants';
 
+const HighContrastContext = createContext();
+
 const HC_KEY = 'medisauti:high_contrast';
 
 const HC_COLORS = {
