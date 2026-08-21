@@ -4,6 +4,28 @@
 
 ---
 
+## About the Project
+
+MEDISAUTI is a cross-platform mobile application built with React Native (Expo) that helps patients — particularly Swahili speakers in Kenya — take their medication correctly and on time, while giving doctors remote visibility into their patients' adherence.
+
+Poor medication adherence is a major cause of treatment failure for chronic conditions such as diabetes, hypertension, and HIV. MEDISAUTI tackles this with a workflow designed around real-world constraints:
+
+1. **Scan** — Patients photograph their paper prescriptions. On-device OCR (Tesseract.js) extracts the raw text, which is then intelligently parsed into structured medication records (drug name, dosage, form, frequency, schedule) by AI models (Gemini or GPT-4o-mini), with a regex fallback when no AI provider is configured.
+2. **Remind** — The app schedules daily dose reminders via push notifications and announces them aloud using **Swahili text-to-speech** (`sw-KE`), making it accessible to low-literacy users.
+3. **Track** — Every dose event (taken / missed / snoozed) is logged with a timestamp. The app derives adherence percentages, daily streaks, per-medication breakdowns, and trend analytics entirely on-device.
+4. **Share & Monitor** — Patients generate PDF/JSON/CSV reports shareable via WhatsApp or email, and can link to a doctor who monitors their adherence, issues prescriptions remotely, and views aggregate analytics grouped by medication or condition.
+
+Key characteristics:
+
+- **Bilingual UI** — Full Swahili/English localization (437+ translation keys), switchable at any time.
+- **Offline-first** — All core features work without internet using AES-256-encrypted local storage; cloud sync via Supabase activates automatically when configured.
+- **Accessible** — Dark mode and a high-contrast mode for visually impaired users.
+- **Secure** — Role-based access (patient vs. doctor), 4-digit PIN + biometric login, SMS-based PIN reset with brute-force protection, and Row-Level Security across all backend tables.
+
+The project was developed as a Computer Science final-year project at Kabarak University.
+
+---
+
 ## Tech Stack
 
 - **React Native** (Expo managed workflow, JavaScript, Hermes engine)
