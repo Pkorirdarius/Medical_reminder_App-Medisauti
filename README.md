@@ -2,7 +2,14 @@
 
 **Swahili Voice-Enabled Medication Adherence App for Patients & Doctors**
 
+![React Native](https://img.shields.io/badge/React%20Native-0.73.6-61dafb?logo=react&logoColor=white)
+![Expo](https://img.shields.io/badge/Expo-50-black?logo=expo&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-2.110.0-3ecf8e?logo=supabase&logoColor=white)
+![License](https://img.shields.io/badge/License-Unspecified-lightgrey)
+
 **Kabarak University — Computer Science & IT · Darius Korir Pilakan (CS/M/1149/09/23)**
+
+**Repository:** [github.com/Pkorirdarius/Medical_reminder_App-Medisauti](https://github.com/Pkorirdarius/Medical_reminder_App-Medisauti)
 
 ---
 
