@@ -1,40 +1,41 @@
 # MEDISAUTI
-### Swahili Voice-Enabled Medication Adherence App for Patients & Doctors
+
+**Swahili Voice-Enabled Medication Adherence App for Patients & Doctors**
+
 **Kabarak University — Computer Science & IT · Darius Korir Pilakan (CS/M/1149/09/23)**
 
 ---
 
-## About the Project
+## About
 
-MEDISAUTI is a cross-platform mobile application built with React Native (Expo) that helps patients — particularly Swahili speakers in Kenya — take their medication correctly and on time, while giving doctors remote visibility into their patients' adherence.
+MEDISAUTI is a cross-platform mobile app (React Native + Expo) that helps patients — particularly Swahili speakers in Kenya — take their medication correctly and on time, while giving doctors remote visibility into their patients' adherence.
 
-Poor medication adherence is a major cause of treatment failure for chronic conditions such as diabetes, hypertension, and HIV. MEDISAUTI tackles this with a workflow designed around real-world constraints:
+Poor medication adherence is a major cause of treatment failure for chronic conditions such as diabetes, hypertension, and HIV. MEDISAUTI works around one core workflow:
 
-1. **Scan** — Patients photograph their paper prescriptions. On-device OCR (Tesseract.js) extracts the raw text, which is then intelligently parsed into structured medication records (drug name, dosage, form, frequency, schedule) by AI models (Gemini or GPT-4o-mini), with a regex fallback when no AI provider is configured.
-2. **Remind** — The app schedules daily dose reminders via push notifications and announces them aloud using **Swahili text-to-speech** (`sw-KE`), making it accessible to low-literacy users.
-3. **Track** — Every dose event (taken / missed / snoozed) is logged with a timestamp. The app derives adherence percentages, daily streaks, per-medication breakdowns, and trend analytics entirely on-device.
-4. **Share & Monitor** — Patients generate PDF/JSON/CSV reports shareable via WhatsApp or email, and can link to a doctor who monitors their adherence, issues prescriptions remotely, and views aggregate analytics grouped by medication or condition.
+1. **Scan** — Patients photograph paper prescriptions. On-device OCR (Tesseract.js) extracts the text, which AI (Gemini or GPT-4o-mini) parses into structured medication records (name, dosage, form, frequency, schedule), with a regex fallback when no AI provider is configured.
+2. **Remind** — Daily dose reminders fire as push notifications and are announced aloud in **Swahili text-to-speech** (`sw-KE`), making the app accessible to low-literacy users.
+3. **Track** — Every dose event (taken / missed / snoozed) is logged with a timestamp. Adherence percentages, streaks, per-medication breakdowns, and trends are computed entirely on-device.
+4. **Share & Monitor** — Patients generate PDF/JSON/CSV reports shareable via WhatsApp or email, and can link to a doctor who monitors adherence, issues prescriptions remotely, and views aggregate analytics.
 
-Key characteristics:
+**Key characteristics:**
 
-- **Bilingual UI** — Full Swahili/English localization (437+ translation keys), switchable at any time.
+- **Bilingual UI** — Full Swahili/English localization (~378 translation keys), switchable at any time.
 - **Offline-first** — All core features work without internet using AES-256-encrypted local storage; cloud sync via Supabase activates automatically when configured.
 - **Accessible** — Dark mode and a high-contrast mode for visually impaired users.
 - **Secure** — Role-based access (patient vs. doctor), 4-digit PIN + biometric login, SMS-based PIN reset with brute-force protection, and Row-Level Security across all backend tables.
-
-The project was developed as a Computer Science final-year project at Kabarak University.
 
 ---
 
 ## Tech Stack
 
-- **React Native** (Expo managed workflow, JavaScript, Hermes engine)
+- **React Native** — Expo managed workflow, JavaScript, Hermes engine (0.73.6)
 - **Supabase** — cloud backend (auth, database, Edge Functions, RLS)
-- **Expo** ecosystem — camera, speech, notifications, file system, biometrics
+- **Expo ecosystem** — camera, speech, notifications, file system, biometrics
 - **Tesseract.js** — on-device OCR via hidden WebView
 - **AI OCR** — cloud-based intelligent parsing via Gemini / GitHub Models (GPT-4o-mini)
 - **aes-js** — AES-256-CTR encryption for local storage at rest (Hermes-compatible)
 - **AsyncStorage** + **expo-secure-store** — offline-first local persistence & hardware-backed key storage
+- **Twilio** — SMS verification codes via Supabase Edge Functions (PIN reset)
 
 ---
 
@@ -45,14 +46,14 @@ medisauti/
 ├── App.js                              # Entry point — fonts, providers, navigation
 ├── app.json                            # Expo configuration + plugins + permissions
 ├── package.json                        # Dependencies
-├── supabase-schema.sql                 # Database schema (7 tables + RLS policies)
+├── supabase-schema.sql                 # Database schema (7 base tables + RLS)
 ├── .env                                # Environment variables (not committed)
 ├── supabase/
 │   ├── functions/
 │   │   ├── send-sms/index.ts           # Edge Function — Twilio SMS verification
-│   │   └── verify-sms/index.ts        # Edge Function — verify SMS codes
+│   │   └── verify-sms/index.ts         # Edge Function — verify SMS codes
 │   └── migrations/
-│       └── 001_security_hardening.sql  # Auth UIDs, audit log, RLS fixes
+│       └── 001_security_hardening.sql  # Auth UIDs, audit log, SMS codes, RLS fixes
 └── src/
     ├── navigation/
     │   └── AppNavigator.js             # Role-based navigation (patient/doctor tabs)
@@ -73,16 +74,16 @@ medisauti/
     │   ├── ErrorBoundary.js            # React error boundary with recovery UI
     │   └── OfflineIndicator.js         # Network status banner (NetInfo)
     └── utils/
-        ├── constants.js                # Design tokens — colors (light/dark), radius, shadows, fonts
-        ├── storage.js                  # AES-encrypted AsyncStorage CRUD + Supabase sync + adherence calculations
-        ├── reminders.js                # Expo Notifications + Expo Speech (Swahili TTS)
+        ├── constants.js                # Design tokens — colors, radius, shadows, fonts
+        ├── storage.js                  # AES-encrypted storage CRUD + Supabase sync + analytics
+        ├── reminders.js                # Notifications + Swahili TTS + sound preferences
         ├── ocr.js                      # Tesseract.js WebView HTML + OCR text parser
         ├── ai.js                       # AI OCR parsing — Gemini & GitHub Models (GPT-4o-mini)
-        ├── supabase.js                 # Supabase client — auth, CRUD, SMS, edge function calls
-        ├── lang.js                     # Bilingual localization dictionary (437+ keys, SW/EN)
-        ├── LanguageContext.js           # React context — Swahili/English i18n
-        ├── ThemeContext.js              # React context — dark/light theme with persistence
-        └── HighContrastContext.js       # React context — high-contrast accessibility mode
+        ├── supabase.js                 # Supabase client — auth, CRUD, SMS edge functions
+        ├── lang.js                     # Bilingual localization dictionary (~378 keys)
+        ├── LanguageContext.js          # React context — Swahili/English i18n
+        ├── ThemeContext.js             # React context — dark/light theme with persistence
+        └── HighContrastContext.js      # React context — high-contrast accessibility mode
 ```
 
 ---
@@ -95,8 +96,8 @@ medisauti/
 - **Prescription Management** — add/edit/delete meds with 10 dosage forms, duration, stock tracking
 - **Camera OCR Scan** — real-time viewfinder, torch toggle, gallery pick, recent scans history
 - **AI-Powered OCR** — Tesseract.js extracts text, then Gemini or GPT-4o-mini parses medication details intelligently
-- **Swahili/English Localization** — full bilingual UI (437+ translation keys), persisted to AsyncStorage
-- **Daily Reminders** — Expo Notifications with Swahili TTS (`sw-KE`), snooze, mark-as-taken/missed
+- **Swahili/English Localization** — full bilingual UI (~378 translation keys), persisted to AsyncStorage
+- **Daily Reminders** — Expo Notifications with Swahili TTS (`sw-KE`), snooze, mark-as-taken/missed, custom notification sound
 - **Adherence Tracking** — dose logging with timestamps, streak calculation, per-medication analytics
 - **Reports & Export** — HTML/PDF generation (`expo-print`), JSON/CSV data export, WhatsApp/email sharing
 - **Doctor Linking** — browse and link to a doctor for remote monitoring
@@ -113,8 +114,8 @@ medisauti/
 ### Authentication & Security
 - **Role-Based Access** — separate patient/doctor navigation and capabilities
 - **PIN Reset via SMS** — Twilio Edge Functions send verification codes, verify, then reset PIN
-- **Brute-Force Protection** — 5-attempt lockout with 30-second cooldown
-- **Supabase RLS** — row-level security policies on all 7 tables
+- **Brute-Force Protection** — 5-attempt lockout with 30-second cooldown; server-side SMS rate limiting (max 3 codes per phone / 10 min)
+- **Supabase RLS** — row-level security policies on all backend tables
 - **Security Audit Log** — tracks security events in dedicated table
 
 ---
@@ -176,9 +177,24 @@ npx expo start
 ### Database Setup (Supabase)
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Run `supabase-schema.sql` in the SQL Editor
-3. Run `supabase/migrations/001_security_hardening.sql`
-4. Deploy Edge Functions: `supabase functions deploy send-sms` and `supabase functions deploy verify-sms`
+2. Run `supabase-schema.sql` in the SQL Editor (7 base tables + RLS policies)
+3. Run the security migration: `supabase/migrations/001_security_hardening.sql`
+   (adds `sms_codes` and `security_audit_log` tables + stored procedures)
+4. Deploy Edge Functions and set their secrets:
+
+   ```bash
+   supabase functions deploy send-sms
+   supabase functions deploy verify-sms
+
+   # Set Edge Function secrets (required for SMS to work)
+   supabase secrets set TWILIO_ACCOUNT_SID=your_account_sid \
+     TWILIO_AUTH_TOKEN=your_auth_token \
+     TWILIO_FROM_NUMBER=your_twilio_phone
+   ```
+
+   > The Edge Functions also use `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+   > (set automatically when the functions are deployed).
+
 5. Copy your project URL and anon key into `.env`
 
 ### Building for Production
@@ -199,71 +215,58 @@ eas build --platform ios
 
 ---
 
-## Key Design Decisions
+## Architecture & Key Design Decisions
 
 ### Hybrid Cloud + Offline Architecture
-The app operates in two modes:
-- **With Supabase configured** — data syncs to cloud, enables doctor-patient features, SMS verification
-- **Without Supabase** — fully offline via AsyncStorage; all core features work without internet
+The app runs in two modes:
+- **With Supabase configured** — data syncs to cloud, enabling doctor-patient features and SMS verification
+- **Offline** — fully offline via AsyncStorage; all core features work without internet
 
 ### Supabase Data Flow (v2 API Compatibility)
-The app uses `@supabase/supabase-js` v2.110.0, which removed the synchronous `auth.currentUser`
-property. All Supabase data queries (prescriptions, doctor links, adherence logs) depend on a cached
-user UID (`_cachedUid` in `storage.js`) that is set:
-- On successful login (`AuthScreen.handleLogin()`)
-- On session restore from AsyncStorage (`AppNavigator.onAuthChanged`)
-- On first load after app restart
-
-Without this cache, `isFB()` returns `false` and the app silently falls back to local-only mode,
-even with valid Supabase credentials. See `getUid()` in `src/utils/storage.js:225`.
+The app uses `@supabase/supabase-js` v2, which removed the synchronous `auth.currentUser`
+property. All Supabase queries depend on a cached user UID (`_cachedUid` in `storage.js`) that is
+set on login, session restore, and first load. Without this cache, `isFB()` returns `false` and
+the app silently falls back to local-only mode, even with valid Supabase credentials.
+See `getUid()` in `src/utils/storage.js:228`.
 
 ### Offline Persistence
-User data (prescriptions, adherence logs, doctor selection, schedules) is **not cleared on logout**.
-Logout only terminates the Supabase session and cancels notification timers. On re-login, data is
-proactively synced from Supabase and cached locally. This prevents data loss during normal logout/login
-cycles. Local data is only purged on user switch (different phone number) or explicit app reinstall.
+User data is **not cleared on logout** — logout only terminates the Supabase session and cancels
+notification timers. On re-login, data is proactively synced from Supabase and cached locally.
+Local data is only purged on user switch (different phone number) or app reinstall.
 
 ### AI-Powered OCR Pipeline
 1. Tesseract.js runs in a hidden WebView to extract raw text from camera captures
-2. Raw text is sent to Gemini (gemini-2.0-flash) or GitHub Models (GPT-4o-mini) for intelligent parsing
-3. AI extracts drug name, dosage, form, frequency, and schedule times as structured JSON
+2. Raw text is sent to Gemini (`gemini-2.0-flash`) or GitHub Models (`gpt-4o-mini`) for parsing
+3. AI extracts drug name, dosage, form, frequency, and schedule as structured JSON
 4. Falls back to regex parsing when no AI provider is configured
 
 ### Swahili TTS
-`expo-speech` supports the `sw-KE` language code. If the device's TTS engine
-does not support Swahili, the code gracefully falls back to English (`en-US`).
-
-### Bilingual Localization
-437+ translation keys in `lang.js` cover all UI strings in both Swahili and English.
-Language preference is persisted to AsyncStorage and toggleable from any screen.
-
-### Role-Based Navigation
-Patient and doctor roles have completely separate tab navigation and screen sets.
-Doctors see analytics and patient management; patients see reminders and medication management.
+`expo-speech` uses the `sw-KE` language code. If the device's TTS engine does not support
+Swahili, the code falls back to English (`en-US`). Notification sounds are also user-configurable.
 
 ### Hermes Engine Compatibility
-The app targets Hermes (React Native 0.73.6), which lacks `TextEncoder`/`TextDecoder`,
-`btoa`/`atob`, and the `AESEncryptionKey` API from newer `expo-crypto` versions.
-Manual implementations replace these:
-- Base64 encoding/decoding via byte-level `bytesToB64`/`b64ToBytes`
-- UTF-8 conversion via `utf8ToBytes`/`bytesToUtf8` (using `encodeURIComponent`/`unescape`)
-- AES-256-CTR via `aes-js` library instead of `expo-crypto`'s AES-GCM
+React Native 0.73.6's Hermes engine lacks `TextEncoder`/`TextDecoder`, `btoa`/`atob`, and newer
+`expo-crypto` AES APIs. Manual implementations replace these: base64 via `bytesToB64`/`b64ToBytes`,
+UTF-8 via `utf8ToBytes`/`bytesToUtf8`, and AES-256-CTR via `aes-js` instead of `expo-crypto`.
 
-### Adherence Logging
-Every dose event (taken / missed / snoozed) is logged with a timestamp.
-`calcAdherence()`, `getDailyStreak()`, `getPerMedicationAdherence()`, and `getAdherenceTrend()`
-derive analytics entirely on-device from these logs.
+### Adherence Analytics
+Every dose event (taken / missed / snoozed) is logged with a timestamp. Available analytics,
+all computed on-device:
+- `calcAdherence()` — overall & per-medication adherence percentages
+- `getDailyStreak()` / `getCurrentStreak()` / `getBestStreak()` — streak tracking
+- `getPerMedicationAdherence()` — breakdown by drug
+- `getAdherenceTrend()` — trend over time
+- `getMissedDosePatterns()` — patterns by time of day (morning/afternoon/evening/night)
 
 ### PDF & Data Export
-Reports are generated as HTML via `expo-print` for native PDF generation.
-Additional export formats include JSON and CSV via `expo-file-system`.
-Sharing uses the native share sheet (WhatsApp, Gmail, SMS, etc.).
+Reports are generated as HTML via `expo-print` for native PDF generation, plus JSON/CSV via
+`expo-file-system`. Sharing uses the native share sheet (WhatsApp, Gmail, SMS, etc.).
 
 ---
 
 ## Database Schema
 
-7 tables with Row-Level Security:
+9 tables, all with Row-Level Security:
 
 | Table | Purpose |
 |---|---|
@@ -274,14 +277,34 @@ Sharing uses the native share sheet (WhatsApp, Gmail, SMS, etc.).
 | `schedules` | Reminder schedules per user |
 | `my_doctor` | Patient-doctor relationships |
 | `condition_presets` | Default prescriptions per medical condition |
+| `sms_codes` | SMS verification codes for PIN reset (*added by migration*) |
+| `security_audit_log` | Security event tracking (*added by migration*) |
+
+The migration also creates two `SECURITY DEFINER` stored procedures used by the Edge Functions:
+- `admin_update_user_password(target_user_id, new_encrypted_password)` — updates reused by PIN reset
+- `get_user_by_phone(target_phone)` — user lookup by phone during PIN reset
 
 ---
 
 ## Notes for Supervisor
 
-- Push notifications require a physical device; they will not fire in Expo Go on
-  some Android simulators.
+- Push notifications require a physical device; they may not fire in Expo Go on some
+  Android simulators.
 - Tesseract.js OCR requires internet on first load (CDN). For fully offline OCR,
   bundle the Tesseract WASM and `eng.traineddata` as Expo assets.
 - The `android/` directory exists from a local `expo prebuild` — the app can also
   be built locally without EAS.
+
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch (`git checkout -b feature/my-feature`)
+2. Install dependencies with `npm install`
+3. Test your changes locally with `npx expo start`
+4. Ensure translations are added to `src/utils/lang.js` for any new UI strings
+5. Commit your changes and open a pull request describing the change
+
+## License
+
+No license has been specified for this project yet.
