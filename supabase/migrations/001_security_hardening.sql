@@ -46,17 +46,31 @@ DROP POLICY IF EXISTS "doctors_write_all" ON doctors;
 DROP POLICY IF EXISTS "doctors_update_all" ON doctors;
 
 -- Doctors: only the owner can INSERT/UPDATE their own row
-CREATE POLICY "doctors_insert_own" ON doctors
-  FOR INSERT WITH CHECK (
-    auth.uid() = (data->>'uid')::uuid
-    OR auth.uid() = auth_uid
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'doctors' AND policyname = 'doctors_insert_own'
+  ) THEN
+    CREATE POLICY "doctors_insert_own" ON doctors
+      FOR INSERT WITH CHECK (
+        auth.uid() = (data->>'uid')::uuid
+        OR auth.uid() = auth_uid
+      );
+  END IF;
+END $$;
 
-CREATE POLICY "doctors_update_own" ON doctors
-  FOR UPDATE USING (
-    auth.uid() = (data->>'uid')::uuid
-    OR auth.uid() = auth_uid
-  );
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'doctors' AND policyname = 'doctors_update_own'
+  ) THEN
+    CREATE POLICY "doctors_update_own" ON doctors
+      FOR UPDATE USING (
+        auth.uid() = (data->>'uid')::uuid
+        OR auth.uid() = auth_uid
+      );
+  END IF;
+END $$;
 
 -- Doctors: authenticated users can still read the directory
 -- (doctors_read_all already exists from initial schema)
