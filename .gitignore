@@ -9,3 +9,8 @@ dist-*
 .DS_Store
 Thumbs.db
 android
+ios
+*.p12
+*.keystore
+.expo/
+expo-env.d.ts

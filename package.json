@@ -5,7 +5,13 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "dev": "expo start",
+    "web": "expo start --web",
+    "build:apk": "expo export --platform android",
+    "build:web": "expo export --platform web",
+    "eas:build:preview": "eas build --platform android --profile preview",
+    "eas:build:production": "eas build --platform all --profile production"
   },
   "dependencies": {
     "@expo-google-fonts/lexend": "^0.4.1",
