@@ -32,8 +32,8 @@ jobs:
           EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
           EXPO_NO_DOCTOR: "1"
       - name: Download APK
-        if: env.RELEASE_URL != ''
-        run: curl -L -H "Authorization: Bearer $EXPO_TOKEN" -o medisauti.apk "$RELEASE_URL"
+        if: ${{ env.RELEASE_URL != '' }}
+        run: 'curl -L -H "Authorization: Bearer $EXPO_TOKEN" -o medisauti.apk "$RELEASE_URL"'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       - name: Attach APK to GitHub Release
