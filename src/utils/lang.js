@@ -123,7 +123,7 @@ const LANG = {
   hero_subtitle:           { sw: 'Changanua lebo yako ya dawa kwa kutumia kamera au ingiza kwa mkono.', en: 'Scan your medication label using the camera or enter it manually.' },
   scanning:                { sw: 'Inasoma...', en: 'Scanning...' },
   ocr_ai_title:            { sw: 'Akili Bandia', en: 'AI Parsing' },
-  ocr_ai_no_key:           { sw: 'Hakuna ufunguo wa AI. Inatumia uchambuzi wa mitaa (regex). Weka EXPO_PUBLIC_GEMINI_API_KEY au EXPO_PUBLIC_GITHUB_PAT kwenye .env ili kuwezesha.', en: 'No AI key set. Using local regex parsing. Add EXPO_PUBLIC_GEMINI_API_KEY or EXPO_PUBLIC_GITHUB_PAT to .env to enable.' },
+  ocr_ai_no_key:           { sw: 'Hakuna ufunguo wa AI. Inatumia uchambuzi wa mitaa (regex). Weka EXPO_PUBLIC_GROQ_API_KEY kwenye .env ili kuwezesha.', en: 'No AI key set. Using local regex parsing. Add EXPO_PUBLIC_GROQ_API_KEY to .env to enable.' },
   ready_to_scan:           { sw: 'Tayari kuchanganua', en: 'Ready to scan' },
   manual_entry:            { sw: 'Andika Mwenyewe', en: 'Manual Entry' },
   manual_entry_desc:       { sw: 'Ingiza dawa kwa mkono.', en: 'Type medication details manually.' },

@@ -156,9 +156,9 @@ medisauti/
 Create a `.env` file in the project root:
 
 ```bash
-# AI OCR (at least one required for AI parsing; falls back to regex without)
+# AI OCR (Groq is primary; Gemini optional — falls back to regex without)
+EXPO_PUBLIC_GROQ_API_KEY=your_groq_api_key
 EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
-EXPO_PUBLIC_GITHUB_PAT=your_github_pat
 
 # Supabase (optional; app works fully offline without these)
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -249,7 +249,7 @@ installable APK**. Everything below is free.
 4. **Add GitHub repository secrets** (Settings → Secrets → Actions):
    - `EXPO_TOKEN` — from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens)
    - `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-   - `EXPO_PUBLIC_GEMINI_API_KEY`, `EXPO_PUBLIC_GITHUB_PAT`
+   - `EXPO_PUBLIC_GROQ_API_KEY`, `EXPO_PUBLIC_GEMINI_API_KEY`
 5. **Trigger a build** by pushing a version tag (or run the workflow manually):
    ```bash
    git tag v1.0.0 && git push origin v1.0.0
