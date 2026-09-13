@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,28 +17,29 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Setup EAS
-        run: npx eas-cli@latest build --platform android --profile preview --non-interactive
+      - name: Build APK on EAS
+        id: eas_build
+        run: |
+          OUTPUT=$(npx eas-cli@latest build --platform android --profile preview --non-interactive 2>&1)
+          echo "$OUTPUT"
+          echo "RELEASE_URL=$(echo "$OUTPUT" | grep -oE 'https://expo.dev/artifacts/eas/[a-zA-Z0-9-]+' | head -1)" >> $GITHUB_ENV
+          echo "BUILD_URL=$(echo "$OUTPUT" | grep -oE 'https://expo.dev/accounts/[^ ]+' | head -1)" >> $GITHUB_ENV
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           EXPO_PUBLIC_GEMINI_API_KEY: ${{ secrets.EXPO_PUBLIC_GEMINI_API_KEY }}
           EXPO_PUBLIC_GITHUB_PAT: ${{ secrets.EXPO_PUBLIC_GITHUB_PAT }}
+          EXPO_PUBLIC_GROQ_API_KEY: ${{ secrets.EXPO_PUBLIC_GROQ_API_KEY }}
           EXPO_NO_DOCTOR: "1"
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: medisauti-apk
-          path: |
-            *.apk
-            android/**/*.apk
-            android/**/*.aab
-          if-no-files-found: ignore
-      - name: Attach APK to release
+      - name: Download APK
+        if: env.RELEASE_URL != ''
+        run: curl -L -H "Authorization: Bearer $EXPO_TOKEN" -o medisauti.apk "$RELEASE_URL"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Attach APK to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            android/app/build/outputs/**/*.apk
+          files: medisauti.apk
           generate_release_notes: true

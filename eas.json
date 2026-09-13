@@ -20,9 +20,6 @@
       "android": {
         "buildType": "app-bundle"
       }
-    },
-    "web": {
-      "distribution": "static"
     }
   },
   "submit": {

@@ -1,5 +1,6 @@
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 const GITHUB_PAT = process.env.EXPO_PUBLIC_GITHUB_PAT || '';
+const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY || '';
 
 const SYSTEM_PROMPT = `You are a medical OCR parser. Given raw OCR text from a medication label, extract and return ONLY valid JSON with these fields:
 {
@@ -20,12 +21,14 @@ Rules:
 - If you cannot parse anything, return {"drugName":"","dosage":"","dosageQuantity":"","dosageForm":"tablet","frequency":"","times":[]}`;
 
 export function hasProvider() {
-  return !!(GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here')
-      || !!(GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here');
+  return !!(GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here')
+      || !!(GROQ_API_KEY && GROQ_API_KEY !== 'your_groq_api_key_here')
+      || !!(GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here');
 }
 
 export function getProvider() {
   if (GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here') return 'GitHub';
+  if (GROQ_API_KEY && GROQ_API_KEY !== 'your_groq_api_key_here') return 'Groq';
   if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here') return 'Gemini';
   return null;
 }
@@ -73,6 +76,36 @@ async function parseWithGitHub(rawText) {
   return JSON.parse(cleaned);
 }
 
+async function parseWithGroq(rawText) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildUserPrompt(rawText) },
+      ],
+      temperature: 0.1,
+      max_tokens: 256,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    console.warn('Groq API error:', res.status, err);
+    return null;
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content || '';
+  const cleaned = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(cleaned);
+}
+
 async function parseWithGemini(rawText) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -105,13 +138,18 @@ async function parseWithGemini(rawText) {
 export async function parseWithAI(rawText) {
   if (!hasProvider()) return null;
 
-  try {
-    if (GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here') {
-      return await parseWithGitHub(rawText);
+  const candidates = [];
+  if (GITHUB_PAT && GITHUB_PAT !== 'your_github_pat_here') candidates.push(parseWithGitHub);
+  if (GROQ_API_KEY && GROQ_API_KEY !== 'your_groq_api_key_here') candidates.push(parseWithGroq);
+  if (GEMINI_API_KEY && GEMINI_API_KEY !== 'your_gemini_api_key_here') candidates.push(parseWithGemini);
+
+  for (const parse of candidates) {
+    try {
+      const result = await parse(rawText);
+      if (result && result.drugName) return result;
+    } catch (e) {
+      console.warn('AI parse failed, trying next provider:', e);
     }
-    return await parseWithGemini(rawText);
-  } catch (e) {
-    console.warn('AI parse failed:', e);
-    return null;
   }
+  return null;
 }

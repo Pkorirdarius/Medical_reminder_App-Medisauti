@@ -213,12 +213,84 @@ npm install -g eas-cli
 # Login to Expo account
 eas login
 
-# Build Android APK
+# Configure build credentials once
+npx eas credentials
+
+# Build Android APK (shareable, installable directly)
 eas build --platform android --profile preview
+
+# Build release AAB (for Google Play Store)
+eas build --platform android --profile production
 
 # Build iOS IPA (requires Apple Developer account)
 eas build --platform ios
 ```
+
+---
+
+## Production Deployment (Free)
+
+This app is a native mobile app, so "hosting" means **building the app and distributing the
+installable APK**. Everything below is free.
+
+### Option A — EAS Build + GitHub Releases (recommended, $0)
+
+1. **Create a free Expo account** at [expo.dev](https://expo.dev) and run `eas login`.
+   - Free tier includes unlimited **EAS Build** (APK/AAB) for personal projects.
+2. **Initialize the project once:**
+   ```bash
+   npx eas-cli init
+   npx eas credentials   # generates a production signing keystore (auto-managed)
+   ```
+3. **Create a GitHub repo** (or use the existing one) and push:
+   ```bash
+   git push -u origin main
+   ```
+4. **Add GitHub repository secrets** (Settings → Secrets → Actions):
+   - `EXPO_TOKEN` — from [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens)
+   - `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+   - `EXPO_PUBLIC_GEMINI_API_KEY`, `EXPO_PUBLIC_GITHUB_PAT`
+5. **Trigger a build** by pushing a version tag (or run the workflow manually):
+   ```bash
+   git tag v1.0.0 && git push origin v1.0.0
+   ```
+   The included workflow (`.github/workflows/build-apk.yml`) builds the APK on EAS and
+   attaches it to a **GitHub Release** — a free, permanent download link you can share.
+
+### Option B — Google Play Store (free to publish, $25 one-time dev account)
+
+```bash
+eas build --platform android --profile production     # produces an .aab
+eas submit --platform android                          # uploads to Play Console
+```
+Requires a one-time $25 Google Play Developer registration. After approval your app is
+publicly listed.
+
+### Option C — Local APK build (no cloud)
+
+The `android/` project already exists from `expo prebuild`. You can build the APK locally
+with Android Studio or Gradle and send the file directly to testers — no store, no fee.
+
+### Environment variables for OTA updates
+
+```bash
+eas env:list                    # see existing vars
+eas env:create --name EXPO_PUBLIC_SUPABASE_URL --value https://... --environment production
+```
+
+> **Never commit `.env`.** Use `.env.example` (committed) as the template and real values
+> via `eas env`, GitHub secrets, or the local `.env` file (gitignored).
+
+### Release checklist before launch
+
+- [ ] `.env` keys are real and rotated (APKs built by CI use GitHub secrets, not `.env`)
+- [ ] `eas credentials` completed (production keystore, not the debug keystore)
+- [ ] Version bumped in `app.json` (and `android/app/build.gradle`)
+- [ ] Supabase functions deployed: `supabase functions deploy send-sms verify-sms`
+- [ ] Edge-function secrets set (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+      `TWILIO_FROM_NUMBER`)
+- [ ] Push-notification service is set up for production (expo-notifications)
+- [ ] Smoke-test the `.aap`/`.apk` on a physical device before release
 
 ---
 

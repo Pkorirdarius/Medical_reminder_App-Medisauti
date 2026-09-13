@@ -6,6 +6,8 @@ dist-*
 .vscode
 *.tsbuildinfo
 .env
+.env.*
+!.env.example
 .DS_Store
 Thumbs.db
 android
@@ -14,3 +16,4 @@ ios
 *.keystore
 .expo/
 expo-env.d.ts
+

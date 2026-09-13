@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": ["**/*"],
-    "web": {
-      "bundler": "metro",
-      "output": "static"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kabarak.medisauti",
