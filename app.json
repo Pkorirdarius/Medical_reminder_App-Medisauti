@@ -5,7 +5,9 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.kabarak.medisauti",
@@ -18,25 +20,35 @@
     "android": {
       "package": "com.kabarak.medisauti",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "SCHEDULE_EXACT_ALARM",
-        "USE_EXACT_ALARM",
-        "VIBRATE",
-        "POST_NOTIFICATIONS"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
       [
         "expo-notifications",
-        { "color": "#0F6E56" }
+        {
+          "color": "#0F6E56"
+        }
       ],
       [
         "expo-image-picker",
-        { "photosPermission": "MEDISAUTI needs access to your photos to scan prescription images." }
+        {
+          "photosPermission": "MEDISAUTI needs access to your photos to scan prescription images."
+        }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "01f4f543-407c-4ca0-9d37-1c8546003019"
+      }
+    }
   }
 }
