@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSCameraUsageDescription": "MEDISAUTI needs camera access to scan prescription labels using OCR.",
         "NSPhotoLibraryUsageDescription": "MEDISAUTI needs photo library access to scan saved prescription images.",
-        "NSMicrophoneUsageDescription": "Required for text-to-speech reminder playback."
+        "NSMicrophoneUsageDescription": "Required for text-to-speech reminder playback.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
