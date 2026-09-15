@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -34,6 +38,12 @@
     },
     "plugins": [
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "color": "#0F6E56"
@@ -50,6 +60,15 @@
       "eas": {
         "projectId": "01f4f543-407c-4ca0-9d37-1c8546003019"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/01f4f543-407c-4ca0-9d37-1c8546003019",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

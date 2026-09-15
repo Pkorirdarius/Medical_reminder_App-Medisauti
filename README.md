@@ -271,6 +271,21 @@ publicly listed.
 The `android/` project already exists from `expo prebuild`. You can build the APK locally
 with Android Studio or Gradle and send the file directly to testers — no store, no fee.
 
+### Option D — OTA hotfixes / fast deploys (instant, $0)
+
+Once a build is published, every future **JavaScript-only** change can be pushed straight
+to production devices without a rebuild or store review (~2 minutes to go live):
+
+```bash
+npm run eas:update:production     # push to every installed production build
+npm run eas:update:preview        # push to preview/test builds only
+```
+
+A CI workflow (`.github/workflows/deploy-updates.yml`) auto-deploys to the `production`
+channel whenever `src/`, `App.js`, `app.json`, or `package.json` change on `main`.
+Bumps to `app.json` `version` produce a new native runtime (users must update from the
+store); everything else hot-swaps over the air.
+
 ### Environment variables for OTA updates
 
 ```bash
